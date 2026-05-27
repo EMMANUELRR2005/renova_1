@@ -6,7 +6,6 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../core/router/app_router.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/app_text_field.dart';
-import '../../core/widgets/clinica_chip.dart';
 import '../../data/mock/mock_data.dart';
 import 'providers/auth_provider.dart';
 
@@ -18,58 +17,81 @@ class LoginScreen extends ConsumerStatefulWidget {
 }
 
 class _LoginScreenState extends ConsumerState<LoginScreen> {
-  late TextEditingController _usernameController;
+  late TextEditingController _emailController;
   late TextEditingController _passwordController;
-  String _selectedClinic = 'CLI001';
   bool _isLoading = false;
 
   @override
   void initState() {
     super.initState();
-    _usernameController = TextEditingController();
+    _emailController = TextEditingController();
     _passwordController = TextEditingController();
   }
 
   @override
   void dispose() {
-    _usernameController.dispose();
+    _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
   }
 
   void _handleLogin() async {
+    if (_emailController.text.isEmpty || _passwordController.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Por favor completa todos los campos'),
+          backgroundColor: AppColors.danger,
+        ),
+      );
+      return;
+    }
+
     setState(() => _isLoading = true);
 
-    final authNotifier = ref.read(authStateProvider.notifier);
-    final result = await authNotifier.login(
-      _usernameController.text,
-      _passwordController.text,
-      _selectedClinic,
-    );
+    try {
+      // Buscar usuario en mockUsuarios
+      final usuario = mockUsuarios.firstWhere(
+        (u) => u.email == _emailController.text && 
+               u.password == _passwordController.text && 
+               u.activo,
+        orElse: () => throw Exception('Credenciales inválidas'),
+      );
 
-    if (result && mounted) {
-      // Actualizar clínica seleccionada
-      ref.read(selectedClinicStateProvider.notifier).state = _selectedClinic;
-      // Actualizar usuario actual
-      ref.read(currentUserProvider.notifier).state = 
-          User(username: _usernameController.text, clinic: _selectedClinic);
-      // Invalidar router para que reacte al cambio de authState
+      // Establecer usuario activo
+      ref.read(usuarioActivoProvider.notifier).state = usuario;
+      
+      // Invalidar router para que reacte al cambio
       ref.invalidate(goRouterProvider);
-      // Navegar a dashboard con pequeño delay
-      await Future.delayed(const Duration(milliseconds: 200));
+      
       if (mounted) {
-        context.go('/dashboard');
+        // La redirección se hace automáticamente por el router
+        // según el rol del usuario
+        await Future.delayed(const Duration(milliseconds: 300));
+        if (mounted) {
+          context.go(_getRutaInicial(usuario.rol));
+        }
       }
-    } else {
+    } catch (e) {
       if (mounted) {
         setState(() => _isLoading = false);
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Credenciales inválidas. Usa admin/1234'),
+            content: Text('Credenciales inválidas'),
             backgroundColor: AppColors.danger,
           ),
         );
       }
+    }
+  }
+
+  String _getRutaInicial(RolUsuario rol) {
+    switch (rol) {
+      case RolUsuario.administradora:
+        return '/dashboard';
+      case RolUsuario.enfermera:
+        return '/pacientes';
+      case RolUsuario.terapeuta:
+        return '/agenda-terapeuta';
     }
   }
 
@@ -99,7 +121,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     ),
                     child: const Center(
                       child: Text(
-                        '⊕',
+                        '✨',
                         style: TextStyle(
                           fontSize: 48,
                           color: Colors.white,
@@ -108,9 +130,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     ),
                   ),
                   const SizedBox(height: 24),
-                  // Nombre sanatorio
+                  // Nombre clínica
                   Text(
-                    'Sanatorio\nRenova',
+                    'Clínica\nRenova',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 24,
@@ -122,7 +144,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   const SizedBox(height: 12),
                   // Slogan
                   Text(
-                    'Sistema de Control Clínico',
+                    'Belleza y Bienestar',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 14,
@@ -134,9 +156,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   const SizedBox(height: 40),
                   // Características
                   ...[
-                    ('✓', 'Gestión integral de pacientes'),
-                    ('✓', 'Control de citas y agenda'),
-                    ('✓', 'Expedientes digitales seguros'),
+                    ('✓', 'Gestión de pacientes'),
+                    ('✓', 'Control de citas'),
+                    ('✓', 'Expedientes digitales'),
                   ]
                       .map(
                         (feature) => Padding(
@@ -204,40 +226,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         ),
                       ),
                       const SizedBox(height: 32),
-                      // Selector de clínica
-                      Text(
-                        'Clínica',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.textPrimary,
-                          fontFamily: GoogleFonts.dmSans().fontFamily,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: mockClinics
-                            .map(
-                              (clinic) => ClinicaChip(
-                                label: clinic.name,
-                                isSelected: _selectedClinic == clinic.id,
-                                onTap: () {
-                                  setState(() => _selectedClinic = clinic.id);
-                                },
-                              ),
-                            )
-                            .toList(),
-                      ),
-                      const SizedBox(height: 32),
-                      // Usuario
+                      // Email
                       AppTextField(
-                        label: 'Usuario',
-                        hintText: 'admin',
-                        controller: _usernameController,
-                        icon: '👤',
-                        keyboardType: TextInputType.text,
+                        label: 'Email',
+                        hintText: 'admin@renova.gt',
+                        controller: _emailController,
+                        icon: '✉️',
+                        keyboardType: TextInputType.emailAddress,
                       ),
                       const SizedBox(height: 20),
                       // Contraseña
@@ -281,19 +276,23 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       // Credenciales demo
                       Center(
                         child: Text(
-                          'Demo: admin / 1234',
+                          'Prueba con:',
                           style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w400,
-                            color: AppColors.textSecondary,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.textPrimary,
                             fontFamily: GoogleFonts.dmSans().fontFamily,
                           ),
                         ),
                       ),
-                      const SizedBox(height: 8),
+                      const SizedBox(height: 12),
+                      _buildCredentialDemo('Admin', 'admin@renova.gt', '1234'),
+                      _buildCredentialDemo('Enfermera', 'carmen@renova.gt', '1234'),
+                      _buildCredentialDemo('Terapeuta', 'luis@renova.gt', '1234'),
+                      const SizedBox(height: 16),
                       Center(
                         child: Text(
-                          'v1.0.0',
+                          'v1.0.0 - Renova Clínica',
                           style: TextStyle(
                             fontSize: 11,
                             fontWeight: FontWeight.w400,
@@ -312,9 +311,54 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       ),
     );
   }
-}
 
-// Provider para clínica seleccionada durante login
-final selectedClinicStateProvider = StateProvider<String>((ref) {
-  return 'CLI001';
-});
+  Widget _buildCredentialDemo(String role, String email, String password) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: AppColors.bgGeneral,
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(color: AppColors.border),
+        ),
+        child: Row(
+          children: [
+            Text(
+              role,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: AppColors.textPrimary,
+                fontFamily: GoogleFonts.dmSans().fontFamily,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                '$email / $password',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w400,
+                  color: AppColors.textSecondary,
+                  fontFamily: GoogleFonts.dmSans().fontFamily,
+                ),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            TextButton(
+              onPressed: () {
+                _emailController.text = email;
+                _passwordController.text = password;
+              },
+              style: TextButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
+              ),
+              child: const Text('Usar', style: TextStyle(fontSize: 11)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}

@@ -6,6 +6,7 @@ import '../../core/theme/app_theme.dart';
 import '../../core/widgets/app_shell.dart';
 import '../../core/widgets/kpi_card.dart';
 import '../../core/widgets/status_badge.dart';
+import '../../data/mock/mock_data.dart';
 import '../../data/mock/providers.dart';
 
 class DashboardScreen extends ConsumerWidget {
@@ -14,8 +15,8 @@ class DashboardScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final kpiData = ref.watch(kpiDataProvider);
-    final patients = ref.watch(patientsProvider);
-    final patientsList = patients.take(5).toList();
+    final citasHoy = ref.watch(citasHoyProvider);
+    final citasList = citasHoy.take(5).toList();
 
     return AppShell(
       selectedIndex: 0,
@@ -41,41 +42,40 @@ class DashboardScreen extends ConsumerWidget {
               children: [
                 Expanded(
                   child: KpiCard(
-                    icon: '🛏️',
-                    number: '${kpiData['hospitalized']}',
-                    label: 'Hospitalizados',
-                    trend: '↑ 3 vs ayer',
-                    iconBgColor: AppColors.primaryLight,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: KpiCard(
                     icon: '📅',
-                    number: '${kpiData['todayAppointments']}',
+                    number: '${kpiData['citasHoy']}',
                     label: 'Citas hoy',
-                    trend: '→ Sin cambios',
+                    trend: '→ Programadas',
                     iconBgColor: AppColors.successBg,
                   ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: KpiCard(
-                    icon: '🚪',
-                    number: '${kpiData['available']}',
-                    label: 'Camas disponibles',
-                    trend: '↓ 2 ocupadas hoy',
+                    icon: '⏱️',
+                    number: '${kpiData['sesionesEnCurso']}',
+                    label: 'En sesión ahora',
+                    trend: '→ En progreso',
+                    iconBgColor: AppColors.primaryLight,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: KpiCard(
+                    icon: '💰',
+                    number: 'Q ${kpiData['ingresosDelDia'].toStringAsFixed(0)}',
+                    label: 'Ingresos del día',
+                    trend: '↑ Del mes',
                     iconBgColor: AppColors.clinicalGreenBg,
-                    trendColor: AppColors.warning,
                   ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: KpiCard(
                     icon: '⚠️',
-                    number: '${kpiData['alerts']}',
-                    label: 'Alertas pendientes',
-                    trend: 'Revisar ahora',
+                    number: '${kpiData['alertasClinicas']}',
+                    label: 'Alertas clínicas',
+                    trend: 'Revisar pacientes',
                     iconBgColor: AppColors.dangerBg,
                     trendColor: AppColors.danger,
                   ),
@@ -111,7 +111,7 @@ class DashboardScreen extends ConsumerWidget {
                           child: Row(
                             children: [
                               Text(
-                                'ÚLTIMOS INGRESOS',
+                                'PRÓXIMAS CITAS',
                                 style: TextStyle(
                                   fontSize: 12,
                                   fontWeight: FontWeight.w600,
@@ -123,10 +123,10 @@ class DashboardScreen extends ConsumerWidget {
                             ],
                           ),
                         ),
-                        // Tabla de pacientes
-                        ...patientsList.asMap().entries.map((entry) {
+                        // Tabla de citas
+                        ...citasList.asMap().entries.map((entry) {
                           final index = entry.key;
-                          final patient = entry.value;
+                          final cita = entry.value;
                           final isEven = index % 2 == 0;
 
                           return Container(
@@ -142,7 +142,7 @@ class DashboardScreen extends ConsumerWidget {
                                 Expanded(
                                   flex: 15,
                                   child: Text(
-                                    patient.expedient,
+                                    cita.hora,
                                     style: TextStyle(
                                       fontSize: 12,
                                       fontWeight: FontWeight.w500,
@@ -155,7 +155,7 @@ class DashboardScreen extends ConsumerWidget {
                                 Expanded(
                                   flex: 25,
                                   child: Text(
-                                    patient.name,
+                                    'Cita ${cita.id}',
                                     style: TextStyle(
                                       fontSize: 12,
                                       fontWeight: FontWeight.w500,
@@ -169,7 +169,7 @@ class DashboardScreen extends ConsumerWidget {
                                 Expanded(
                                   flex: 20,
                                   child: Text(
-                                    patient.clinica,
+                                    cita.tipoServicio.toString().split('.').last,
                                     style: TextStyle(
                                       fontSize: 12,
                                       fontWeight: FontWeight.w400,
@@ -182,7 +182,7 @@ class DashboardScreen extends ConsumerWidget {
                                 Expanded(
                                   flex: 20,
                                   child: Text(
-                                    patient.doctor,
+                                    'Terapeuta',
                                     style: TextStyle(
                                       fontSize: 12,
                                       fontWeight: FontWeight.w400,
@@ -196,20 +196,14 @@ class DashboardScreen extends ConsumerWidget {
                                 Expanded(
                                   flex: 12,
                                   child: StatusBadge(
-                                    status: StatusType.values.firstWhere(
-                                      (e) =>
-                                          e.name == patient.status ||
-                                          e.toString().split('.').last ==
-                                              patient.status,
-                                      orElse: () => StatusType.waiting,
-                                    ),
+                                    status: _estadoToCita(cita.estado),
                                     fontSize: 11,
                                   ),
                                 ),
                                 Expanded(
                                   flex: 12,
                                   child: Text(
-                                    patient.admission.split(' ')[1],
+                                    'Q${cita.precioBase.toStringAsFixed(0)}',
                                     style: TextStyle(
                                       fontSize: 12,
                                       fontWeight: FontWeight.w400,
@@ -328,5 +322,20 @@ class DashboardScreen extends ConsumerWidget {
         ),
       );
     }).toList();
+  }
+}
+
+StatusType _estadoToCita(EstadoCita estado) {
+  switch (estado) {
+    case EstadoCita.confirmada:
+      return StatusType.inConsultation;
+    case EstadoCita.agendada:
+      return StatusType.waiting;
+    case EstadoCita.en_curso:
+      return StatusType.inConsultation;
+    case EstadoCita.completada:
+      return StatusType.discharged;
+    case EstadoCita.cancelada:
+      return StatusType.emergency;
   }
 }

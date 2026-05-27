@@ -3,8 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../features/auth/providers/auth_provider.dart';
 import '../theme/app_theme.dart';
 import 'sidebar_item.dart';
+import '../../data/mock/mock_data.dart';
 
 class AppShell extends ConsumerWidget {
   final Widget child;
@@ -20,7 +22,8 @@ class AppShell extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final selectedClinic = ref.watch(selectedClinicProvider);
+    final usuarioActivo = ref.watch(usuarioActivoProvider);
+    final rol = usuarioActivo?.rol;
 
     return Scaffold(
       body: Row(
@@ -45,7 +48,7 @@ class AppShell extends ConsumerWidget {
                         ),
                         child: const Center(
                           child: Text(
-                            '⊕',
+                            '✨',
                             style: TextStyle(
                               fontSize: 28,
                               color: Colors.white,
@@ -55,7 +58,7 @@ class AppShell extends ConsumerWidget {
                       ),
                       const SizedBox(height: 12),
                       Text(
-                        'Sanatorio\nRenova',
+                        'Clínica\nRenova',
                         textAlign: TextAlign.center,
                         style: TextStyle(
                           fontSize: 12,
@@ -71,75 +74,7 @@ class AppShell extends ConsumerWidget {
                 Expanded(
                   child: ListView(
                     padding: EdgeInsets.zero,
-                    children: [
-                      SidebarItem(
-                        icon: '📊',
-                        label: 'Dashboard',
-                        isActive: selectedIndex == 0,
-                        onTap: () {
-                          onNavigate(0);
-                          context.go('/dashboard');
-                        },
-                      ),
-                      SidebarItem(
-                        icon: '👥',
-                        label: 'Pacientes',
-                        isActive: selectedIndex == 1,
-                        onTap: () {
-                          onNavigate(1);
-                          context.go('/pacientes');
-                        },
-                      ),
-                      SidebarItem(
-                        icon: '📅',
-                        label: 'Citas',
-                        isActive: selectedIndex == 2,
-                        onTap: () {
-                          onNavigate(2);
-                          context.go('/citas');
-                        },
-                      ),
-                      SidebarItem(
-                        icon: '📋',
-                        label: 'Expedientes',
-                        isActive: selectedIndex == 3,
-                        onTap: () => onNavigate(3),
-                      ),
-                      SidebarItem(
-                        icon: '⚕️',
-                        label: 'Enfermería',
-                        isActive: selectedIndex == 4,
-                        onTap: () => onNavigate(4),
-                      ),
-                      SidebarItem(
-                        icon: '💊',
-                        label: 'Farmacia',
-                        isActive: selectedIndex == 5,
-                        onTap: () => onNavigate(5),
-                      ),
-                      SidebarItem(
-                        icon: '📈',
-                        label: 'Reportes',
-                        isActive: selectedIndex == 6,
-                        onTap: () => onNavigate(6),
-                      ),
-                      const Padding(
-                        padding: EdgeInsets.symmetric(vertical: 8),
-                        child: Divider(color: Color(0xFF1A3F5C)),
-                      ),
-                      SidebarItem(
-                        icon: '⚙️',
-                        label: 'Configuración',
-                        isActive: selectedIndex == 7,
-                        onTap: () => onNavigate(7),
-                      ),
-                      SidebarItem(
-                        icon: '🚪',
-                        label: 'Cerrar sesión',
-                        isActive: false,
-                        onTap: () => context.go('/login'),
-                      ),
-                    ],
+                    children: _buildSidebarItems(context, rol, onNavigate, selectedIndex),
                   ),
                 ),
               ],
@@ -172,7 +107,7 @@ class AppShell extends ConsumerWidget {
                             ),
                             child: const Center(
                               child: Text(
-                                '⊕',
+                                '✨',
                                 style: TextStyle(
                                   fontSize: 20,
                                   color: Colors.white,
@@ -182,7 +117,7 @@ class AppShell extends ConsumerWidget {
                           ),
                           const SizedBox(width: 12),
                           Text(
-                            'Sanatorio Renova',
+                            'Clínica Renova',
                             style: TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.w600,
@@ -192,7 +127,7 @@ class AppShell extends ConsumerWidget {
                           ),
                         ],
                       ),
-                      // Center - Clínica activa
+                      // Center - Rol actual
                       Container(
                         padding: const EdgeInsets.symmetric(
                             horizontal: 12, vertical: 6),
@@ -201,7 +136,7 @@ class AppShell extends ConsumerWidget {
                           borderRadius: BorderRadius.circular(20),
                         ),
                         child: Text(
-                          'Clínica General',
+                          _getRolLabel(rol),
                           style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w500,
@@ -225,10 +160,10 @@ class AppShell extends ConsumerWidget {
                               color: AppColors.primaryLight,
                               borderRadius: BorderRadius.circular(18),
                             ),
-                            child: const Center(
+                            child: Center(
                               child: Text(
-                                'RA',
-                                style: TextStyle(
+                                usuarioActivo?.avatarIniciales ?? 'RN',
+                                style: const TextStyle(
                                   fontSize: 12,
                                   fontWeight: FontWeight.w600,
                                   color: AppColors.primary,
@@ -238,7 +173,7 @@ class AppShell extends ConsumerWidget {
                           ),
                           const SizedBox(width: 12),
                           Text(
-                            'Roberto Anleu',
+                            usuarioActivo?.nombre ?? 'Usuario',
                             style: TextStyle(
                               fontSize: 13,
                               fontWeight: FontWeight.w500,
@@ -265,14 +200,166 @@ class AppShell extends ConsumerWidget {
       ),
     );
   }
+
+  List<Widget> _buildSidebarItems(
+      BuildContext context, RolUsuario? rol, Function(int) onNavigate, int selectedIndex) {
+    final items = <Widget>[];
+
+    if (rol == RolUsuario.administradora) {
+      items.addAll([
+        SidebarItem(
+          icon: '📊',
+          label: 'Dashboard',
+          isActive: selectedIndex == 0,
+          onTap: () {
+            onNavigate(0);
+            context.go('/dashboard');
+          },
+        ),
+        SidebarItem(
+          icon: '👥',
+          label: 'Pacientes',
+          isActive: selectedIndex == 1,
+          onTap: () {
+            onNavigate(1);
+            context.go('/pacientes');
+          },
+        ),
+        SidebarItem(
+          icon: '📅',
+          label: 'Citas',
+          isActive: selectedIndex == 2,
+          onTap: () {
+            onNavigate(2);
+            context.go('/citas');
+          },
+        ),
+        SidebarItem(
+          icon: '📋',
+          label: 'Expedientes',
+          isActive: selectedIndex == 3,
+          onTap: () {
+            onNavigate(3);
+            context.go('/expedientes');
+          },
+        ),
+        SidebarItem(
+          icon: '💰',
+          label: 'Caja',
+          isActive: selectedIndex == 4,
+          onTap: () {
+            onNavigate(4);
+            context.go('/caja');
+          },
+        ),
+        SidebarItem(
+          icon: '📈',
+          label: 'Reportes',
+          isActive: selectedIndex == 5,
+          onTap: () => onNavigate(5),
+        ),
+        SidebarItem(
+          icon: '👨‍💼',
+          label: 'Usuarios',
+          isActive: selectedIndex == 6,
+          onTap: () {
+            onNavigate(6);
+            context.go('/usuarios');
+          },
+        ),
+        const Padding(
+          padding: EdgeInsets.symmetric(vertical: 8),
+          child: Divider(color: Color(0xFF1A3F5C)),
+        ),
+        SidebarItem(
+          icon: '⚙️',
+          label: 'Configuración',
+          isActive: selectedIndex == 7,
+          onTap: () => onNavigate(7),
+        ),
+      ]);
+    } else if (rol == RolUsuario.enfermera) {
+      items.addAll([
+        SidebarItem(
+          icon: '👥',
+          label: 'Pacientes',
+          isActive: selectedIndex == 0,
+          onTap: () {
+            onNavigate(0);
+            context.go('/pacientes');
+          },
+        ),
+        SidebarItem(
+          icon: '📅',
+          label: 'Citas',
+          isActive: selectedIndex == 1,
+          onTap: () {
+            onNavigate(1);
+            context.go('/citas');
+          },
+        ),
+        SidebarItem(
+          icon: '📋',
+          label: 'Expedientes',
+          isActive: selectedIndex == 2,
+          onTap: () {
+            onNavigate(2);
+            context.go('/expedientes');
+          },
+        ),
+        const Padding(
+          padding: EdgeInsets.symmetric(vertical: 8),
+          child: Divider(color: Color(0xFF1A3F5C)),
+        ),
+      ]);
+    } else if (rol == RolUsuario.terapeuta) {
+      items.addAll([
+        SidebarItem(
+          icon: '📅',
+          label: 'Mi Agenda',
+          isActive: selectedIndex == 0,
+          onTap: () {
+            onNavigate(0);
+            context.go('/agenda-terapeuta');
+          },
+        ),
+        const Padding(
+          padding: EdgeInsets.symmetric(vertical: 8),
+          child: Divider(color: Color(0xFF1A3F5C)),
+        ),
+      ]);
+    }
+
+    // Cerrar sesión (todos los roles)
+    items.add(
+      SidebarItem(
+        icon: '🚪',
+        label: 'Cerrar sesión',
+        isActive: false,
+        onTap: () {
+          context.go('/login');
+        },
+      ),
+    );
+
+    return items;
+  }
+
+  String _getRolLabel(RolUsuario? rol) {
+    switch (rol) {
+      case RolUsuario.administradora:
+        return 'Administradora';
+      case RolUsuario.enfermera:
+        return 'Enfermera';
+      case RolUsuario.terapeuta:
+        return 'Terapeuta';
+      case null:
+        return 'Sin rol';
+    }
+  }
 }
 
 // Provider para el índice seleccionado del sidebar
 final selectedSidebarIndexProvider = StateProvider<int>((ref) {
   return 0;
-});
-
-// Provider para clínica seleccionada (reutilizado de mock/providers)
-final selectedClinicProvider = StateProvider<String>((ref) {
-  return 'CLI001';
 });

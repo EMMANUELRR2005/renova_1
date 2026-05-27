@@ -1,86 +1,133 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'mock_data.dart';
 
-// Patients Provider
+// ============================================================================
+// USUARIOS Y AUTENTICACIÓN
+// ============================================================================
+
+final usuariosProvider = Provider<List<Usuario>>((ref) {
+  return mockUsuarios;
+});
+
+// ============================================================================
+// PACIENTES
+// ============================================================================
+
 final patientsProvider = Provider<List<Patient>>((ref) {
   return mockPatients;
 });
 
-// Doctors Provider
-final doctorsProvider = Provider<List<Doctor>>((ref) {
-  return mockDoctors;
-});
-
-// Clinics Provider
-final clinicsProvider = Provider<List<Clinic>>((ref) {
-  return mockClinics;
-});
-
-// Appointments Provider
-final appointmentsProvider = Provider<List<Appointment>>((ref) {
-  return mockAppointments;
-});
-
-// Selected Clinic Provider
-final selectedClinicProvider = StateProvider<String>((ref) {
-  return 'CLI001';
-});
-
-// Active Patient Provider
 final activePatientProvider = StateProvider<Patient?>((ref) {
   return null;
 });
 
-// Filter status
 final patientFilterProvider = StateProvider<String>((ref) {
-  return 'all';
+  return 'todos';
 });
 
-// Search query
 final patientSearchProvider = StateProvider<String>((ref) {
   return '';
 });
 
-// Filtered patients
 final filteredPatientsProvider = Provider<List<Patient>>((ref) {
   final patients = ref.watch(patientsProvider);
   final filter = ref.watch(patientFilterProvider);
   final search = ref.watch(patientSearchProvider);
 
   return patients.where((p) {
-    bool matchesFilter = filter == 'all' || p.status == filter;
+    bool matchesFilter = filter == 'todos'; // Se ampliará según necesidad
     bool matchesSearch = search.isEmpty ||
-        p.name.toLowerCase().contains(search.toLowerCase()) ||
-        p.expedient.toLowerCase().contains(search.toLowerCase());
+        p.nombre.toLowerCase().contains(search.toLowerCase()) ||
+        p.dpi.toLowerCase().contains(search.toLowerCase());
     return matchesFilter && matchesSearch;
   }).toList();
 });
 
-// Today's appointments
-final todayAppointmentsProvider = Provider<List<Appointment>>((ref) {
-  final appointments = ref.watch(appointmentsProvider);
-  final today = DateTime.now();
-  final todayStr =
-      '${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}';
+// ============================================================================
+// TERAPEUTAS
+// ============================================================================
 
-  return appointments.where((a) => a.date == todayStr).toList();
+final terapeutasProvider = Provider<List<Terapeuta>>((ref) {
+  return mockTerapeutas;
 });
 
-// KPI Data
-final kpiDataProvider = Provider<Map<String, dynamic>>((ref) {
-  final patients = ref.watch(patientsProvider);
-  final appointments = ref.watch(todayAppointmentsProvider);
+// ============================================================================
+// SALAS
+// ============================================================================
 
-  final hospitalized =
-      patients.where((p) => p.status == 'hospitalized').length;
-  final available = 15 - hospitalized;
-  final todayAppointments = appointments.length;
-  final alerts = patients.where((p) => p.status == 'emergency').length;
+final salasProvider = Provider<List<Sala>>((ref) {
+  return mockSalas;
+});
+
+// ============================================================================
+// CITAS
+// ============================================================================
+
+final appointmentsProvider = Provider<List<Appointment>>((ref) {
+  return mockAppointments;
+});
+
+final citasHoyProvider = Provider<List<Appointment>>((ref) {
+  final appointments = ref.watch(appointmentsProvider);
+  final hoy = DateTime.now();
+  
+  return appointments
+      .where((a) => a.fecha.year == hoy.year &&
+          a.fecha.month == hoy.month &&
+          a.fecha.day == hoy.day)
+      .toList();
+});
+
+final sesionesActivasProvider = Provider<List<SesionTerapia>>((ref) {
+  return mockSesiones.where((s) => s.fechaHoraFin == null).toList();
+});
+
+// ============================================================================
+// SESIONES DE TERAPIA
+// ============================================================================
+
+final sesionesProvider = Provider<List<SesionTerapia>>((ref) {
+  return mockSesiones;
+});
+
+// ============================================================================
+// PLANES DE TRATAMIENTO
+// ============================================================================
+
+final planesProvider = Provider<List<PlanTratamiento>>((ref) {
+  return mockPlanes;
+});
+
+final planesActivosProvider = Provider<List<PlanTratamiento>>((ref) {
+  final planes = ref.watch(planesProvider);
+  return planes.where((p) => p.activo).toList();
+});
+
+// ============================================================================
+// KPIs PARA DASHBOARD (Clínica Estética)
+// ============================================================================
+
+final kpiDataProvider = Provider<Map<String, dynamic>>((ref) {
+  final citasHoy = ref.watch(citasHoyProvider);
+  final sesionesActivas = ref.watch(sesionesActivasProvider);
+  final planesActivos = ref.watch(planesActivosProvider);
+
+  // Ingresos del día (sumar precioBase de citas completadas de hoy)
+  double ingresosDelDia = citasHoy
+      .where((c) => c.estado == EstadoCita.completada)
+      .fold(0, (sum, c) => sum + c.precioBase);
+
+  // Alertas clínicas (pacientes con alergias críticas)
+  final patients = ref.watch(patientsProvider);
+  int alertasClinicas = patients
+      .where((p) => p.alergias.isNotEmpty || p.condicionesBase.isNotEmpty)
+      .length;
 
   return {
-    'hospitalized': hospitalized,
-    'available': available,
-    'todayAppointments': todayAppointments,
-    'alerts': alerts,
+    'citasHoy': citasHoy.length,
+    'sesionesEnCurso': sesionesActivas.length,
+    'ingresosDelDia': ingresosDelDia,
+    'alertasClinicas': alertasClinicas,
+    'planesActivos': planesActivos.length,
   };
 });

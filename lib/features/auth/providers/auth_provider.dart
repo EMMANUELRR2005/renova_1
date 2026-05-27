@@ -1,45 +1,36 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../data/mock/mock_data.dart';
 
-class User {
-  final String username;
-  final String clinic;
+// Provider del usuario activo (contiene el usuario completo con rol)
+final usuarioActivoProvider = StateProvider<Usuario?>((ref) => null);
 
-  User({required this.username, required this.clinic});
-}
+// Provider del estado de autenticación (basado en si hay usuario activo)
+final authStateProvider = Provider<bool>((ref) {
+  return ref.watch(usuarioActivoProvider) != null;
+});
 
-// Auth state provider - cambiar a StateNotifier para mejor control
-class AuthNotifier extends StateNotifier<bool> {
-  AuthNotifier() : super(false);
+// Provider del rol del usuario autenticado
+final authRolProvider = Provider<RolUsuario?>((ref) {
+  return ref.watch(usuarioActivoProvider)?.rol;
+});
 
-  Future<bool> login(String username, String password, String clinic) async {
-    // Simulación de login con delay
-    await Future.delayed(const Duration(milliseconds: 1500));
+// Provider de login - busca usuario en mockUsuarios por email + password
+final loginProvider = FutureProvider.autoDispose.family<bool, (String, String)>((ref, args) async {
+  final (email, password) = args;
+  await Future.delayed(const Duration(milliseconds: 1500));
 
-    // Credenciales demo
-    if (username == 'admin' && password == '1234') {
-      state = true;
-      return true;
-    }
-
+  try {
+    final usuario = mockUsuarios.firstWhere(
+      (u) => u.email == email && u.password == password && u.activo,
+    );
+    ref.read(usuarioActivoProvider.notifier).state = usuario;
+    return true;
+  } catch (e) {
     return false;
   }
-
-  void logout() {
-    state = false;
-  }
-}
-
-final authStateProvider = StateNotifierProvider<AuthNotifier, bool>((ref) {
-  return AuthNotifier();
 });
 
-// Current user provider
-final currentUserProvider = StateProvider<User?>((ref) {
-  return null;
-});
-
-// Logout provider
-final logoutProvider = FutureProvider.autoDispose<void>((ref) async {
-  ref.read(authStateProvider.notifier).logout();
-  ref.read(currentUserProvider.notifier).state = null;
+// Provider de logout
+final logoutProvider = Provider<void>((ref) {
+  ref.read(usuarioActivoProvider.notifier).state = null;
 });
