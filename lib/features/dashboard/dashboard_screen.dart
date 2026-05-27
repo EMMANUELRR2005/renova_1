@@ -1,0 +1,332 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:google_fonts/google_fonts.dart';
+
+import '../../core/theme/app_theme.dart';
+import '../../core/widgets/app_shell.dart';
+import '../../core/widgets/kpi_card.dart';
+import '../../core/widgets/status_badge.dart';
+import '../../data/mock/providers.dart';
+
+class DashboardScreen extends ConsumerWidget {
+  const DashboardScreen({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final kpiData = ref.watch(kpiDataProvider);
+    final patients = ref.watch(patientsProvider);
+    final patientsList = patients.take(5).toList();
+
+    return AppShell(
+      selectedIndex: 0,
+      onNavigate: (index) {},
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Título
+            Text(
+              'Dashboard',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.w600,
+                color: AppColors.textPrimary,
+                fontFamily: GoogleFonts.dmSans().fontFamily,
+              ),
+            ),
+            const SizedBox(height: 20),
+            // KPI Cards Row
+            Row(
+              children: [
+                Expanded(
+                  child: KpiCard(
+                    icon: '🛏️',
+                    number: '${kpiData['hospitalized']}',
+                    label: 'Hospitalizados',
+                    trend: '↑ 3 vs ayer',
+                    iconBgColor: AppColors.primaryLight,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: KpiCard(
+                    icon: '📅',
+                    number: '${kpiData['todayAppointments']}',
+                    label: 'Citas hoy',
+                    trend: '→ Sin cambios',
+                    iconBgColor: AppColors.successBg,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: KpiCard(
+                    icon: '🚪',
+                    number: '${kpiData['available']}',
+                    label: 'Camas disponibles',
+                    trend: '↓ 2 ocupadas hoy',
+                    iconBgColor: AppColors.clinicalGreenBg,
+                    trendColor: AppColors.warning,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: KpiCard(
+                    icon: '⚠️',
+                    number: '${kpiData['alerts']}',
+                    label: 'Alertas pendientes',
+                    trend: 'Revisar ahora',
+                    iconBgColor: AppColors.dangerBg,
+                    trendColor: AppColors.danger,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 32),
+            // Fila con dos paneles
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Panel izquierdo - Últimos ingresos
+                Expanded(
+                  flex: 60,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: AppColors.card,
+                      border: Border.all(color: AppColors.border),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Column(
+                      children: [
+                        // Header tabla
+                        Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: AppColors.bgGeneral,
+                            borderRadius: const BorderRadius.only(
+                              topLeft: Radius.circular(10),
+                              topRight: Radius.circular(10),
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              Text(
+                                'ÚLTIMOS INGRESOS',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: AppColors.textPrimary,
+                                  fontFamily: GoogleFonts.dmSans().fontFamily,
+                                  letterSpacing: 0.5,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        // Tabla de pacientes
+                        ...patientsList.asMap().entries.map((entry) {
+                          final index = entry.key;
+                          final patient = entry.value;
+                          final isEven = index % 2 == 0;
+
+                          return Container(
+                            color: isEven
+                                ? Colors.white
+                                : const Color(0xFFFAFBFC),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 12,
+                            ),
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  flex: 15,
+                                  child: Text(
+                                    patient.expedient,
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w500,
+                                      color: AppColors.primary,
+                                      fontFamily:
+                                          GoogleFonts.dmSans().fontFamily,
+                                    ),
+                                  ),
+                                ),
+                                Expanded(
+                                  flex: 25,
+                                  child: Text(
+                                    patient.name,
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w500,
+                                      color: AppColors.textPrimary,
+                                      fontFamily:
+                                          GoogleFonts.dmSans().fontFamily,
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                                Expanded(
+                                  flex: 20,
+                                  child: Text(
+                                    patient.clinica,
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w400,
+                                      color: AppColors.textSecondary,
+                                      fontFamily:
+                                          GoogleFonts.dmSans().fontFamily,
+                                    ),
+                                  ),
+                                ),
+                                Expanded(
+                                  flex: 20,
+                                  child: Text(
+                                    patient.doctor,
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w400,
+                                      color: AppColors.textSecondary,
+                                      fontFamily:
+                                          GoogleFonts.dmSans().fontFamily,
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                                Expanded(
+                                  flex: 12,
+                                  child: StatusBadge(
+                                    status: StatusType.values.firstWhere(
+                                      (e) =>
+                                          e.name == patient.status ||
+                                          e.toString().split('.').last ==
+                                              patient.status,
+                                      orElse: () => StatusType.waiting,
+                                    ),
+                                    fontSize: 11,
+                                  ),
+                                ),
+                                Expanded(
+                                  flex: 12,
+                                  child: Text(
+                                    patient.admission.split(' ')[1],
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w400,
+                                      color: AppColors.textSecondary,
+                                      fontFamily:
+                                          GoogleFonts.dmSans().fontFamily,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        }).toList(),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 20),
+                // Panel derecho - Actividad reciente
+                Expanded(
+                  flex: 40,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: AppColors.card,
+                      border: Border.all(color: AppColors.border),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'ACTIVIDAD RECIENTE',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.textPrimary,
+                            fontFamily: GoogleFonts.dmSans().fontFamily,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        ..._buildActivityTimeline(),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  List<Widget> _buildActivityTimeline() {
+    final activities = [
+      ('08:15', 'María J. Pérez ingresada a Clínica General'),
+      ('09:30', 'Nueva cita confirmada - Carlos E. Ajú'),
+      ('10:45', 'Luisa F. Caal en consulta pediátrica'),
+      ('12:00', 'Alta médica procesada - Jorge L. González'),
+      ('14:20', 'Alerta: Patricia E. Rivas - signos vitales'),
+    ];
+
+    return activities.map((activity) {
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 16),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Column(
+              children: [
+                Container(
+                  width: 10,
+                  height: 10,
+                  decoration: BoxDecoration(
+                    color: AppColors.primary,
+                    borderRadius: BorderRadius.circular(5),
+                  ),
+                ),
+                Container(
+                  width: 2,
+                  height: 30,
+                  color: AppColors.border,
+                ),
+              ],
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    activity.$1,
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.primary,
+                      fontFamily: GoogleFonts.dmSans().fontFamily,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    activity.$2,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w400,
+                      color: AppColors.textSecondary,
+                      fontFamily: GoogleFonts.dmSans().fontFamily,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    }).toList();
+  }
+}
