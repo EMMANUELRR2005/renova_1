@@ -11,7 +11,7 @@ class UsuariosScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final usuarios = ref.watch(usuariosProvider);
+    final usuariosAsync = ref.watch(usuariosStreamProvider);
 
     return AppShell(
       selectedIndex: 6,
@@ -42,113 +42,140 @@ class UsuariosScreen extends ConsumerWidget {
               ],
             ),
             const SizedBox(height: 20),
-            Container(
-              decoration: BoxDecoration(
-                color: AppColors.card,
-                border: Border.all(color: AppColors.border),
-                borderRadius: BorderRadius.circular(10),
+            usuariosAsync.when(
+              loading: () => Container(
+                decoration: BoxDecoration(
+                  color: AppColors.card,
+                  border: Border.all(color: AppColors.border),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                padding: const EdgeInsets.all(16),
+                child: const Center(
+                  child: CircularProgressIndicator(),
+                ),
               ),
-              child: ListView.builder(
-                shrinkWrap: true,
-                itemCount: usuarios.length,
-                itemBuilder: (context, index) {
-                  final usuario = usuarios[index];
-                  return Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      border: index < usuarios.length - 1
-                          ? Border(
-                              bottom: BorderSide(color: AppColors.border),
-                            )
-                          : null,
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              usuario.nombre,
-                              style: const TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              usuario.email,
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: AppColors.textSecondary,
-                                fontFamily: GoogleFonts.dmSans().fontFamily,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 2,
-                              ),
-                              decoration: BoxDecoration(
-                                color: _getRolColor(usuario.rol),
-                                borderRadius: BorderRadius.circular(4),
-                              ),
-                              child: Text(
-                                _getRolLabel(usuario.rol),
+              error: (error, stackTrace) => Container(
+                decoration: BoxDecoration(
+                  color: AppColors.card,
+                  border: Border.all(color: AppColors.border),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                padding: const EdgeInsets.all(16),
+                child: Center(
+                  child: Text(
+                    'Error cargando usuarios: $error',
+                    style: const TextStyle(color: AppColors.danger),
+                  ),
+                ),
+              ),
+              data: (usuarios) => Container(
+                decoration: BoxDecoration(
+                  color: AppColors.card,
+                  border: Border.all(color: AppColors.border),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: ListView.builder(
+                  shrinkWrap: true,
+                  itemCount: usuarios.length,
+                  itemBuilder: (context, index) {
+                    final usuario = usuarios[index];
+                    return Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        border: index < usuarios.length - 1
+                            ? Border(
+                                bottom: BorderSide(color: AppColors.border),
+                              )
+                            : null,
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                usuario.nombre,
                                 style: const TextStyle(
-                                  fontSize: 10,
-                                  color: Colors.white,
+                                  fontSize: 14,
                                   fontWeight: FontWeight.w600,
                                 ),
                               ),
-                            ),
-                          ],
-                        ),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 4,
-                              ),
-                              decoration: BoxDecoration(
-                                color: usuario.activo
-                                    ? AppColors.successBg
-                                    : AppColors.dangerBg,
-                                borderRadius: BorderRadius.circular(4),
-                              ),
-                              child: Text(
-                                usuario.activo ? 'Activo' : 'Inactivo',
+                              const SizedBox(height: 4),
+                              Text(
+                                usuario.email,
                                 style: TextStyle(
-                                  fontSize: 11,
-                                  color: usuario.activo
-                                      ? AppColors.success
-                                      : AppColors.danger,
-                                  fontWeight: FontWeight.w600,
+                                  fontSize: 12,
+                                  color: AppColors.textSecondary,
+                                  fontFamily: GoogleFonts.dmSans().fontFamily,
                                 ),
                               ),
-                            ),
-                            const SizedBox(height: 8),
-                            ElevatedButton(
-                              onPressed: () {},
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: usuario.activo
-                                    ? AppColors.warning
-                                    : AppColors.success,
+                              const SizedBox(height: 4),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 2,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: _getRolColor(usuario.rol),
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Text(
+                                  _getRolLabel(usuario.rol),
+                                  style: const TextStyle(
+                                    fontSize: 10,
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
                               ),
-                              child: Text(
-                                usuario.activo ? 'Desactivar' : 'Activar',
-                                style: const TextStyle(fontSize: 11),
+                            ],
+                          ),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 4,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: usuario.activo
+                                      ? AppColors.successBg
+                                      : AppColors.dangerBg,
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Text(
+                                  usuario.activo ? 'Activo' : 'Inactivo',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: usuario.activo
+                                        ? AppColors.success
+                                        : AppColors.danger,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
                               ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  );
-                },
+                              const SizedBox(height: 8),
+                              ElevatedButton(
+                                onPressed: () {},
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: usuario.activo
+                                      ? AppColors.warning
+                                      : AppColors.success,
+                                ),
+                                child: Text(
+                                  usuario.activo ? 'Desactivar' : 'Activar',
+                                  style: const TextStyle(fontSize: 11),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
               ),
             ),
           ],

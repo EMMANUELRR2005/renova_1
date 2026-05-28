@@ -1,3 +1,5 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+
 // ============================================================================
 // ENUMS
 // ============================================================================
@@ -62,6 +64,29 @@ class Usuario {
     required this.activo,
     required this.avatarIniciales,
   });
+
+  Map<String, dynamic> toMap() => {
+    'id': id,
+    'nombre': nombre,
+    'email': email,
+    'rol': rol.name,
+    'activo': activo,
+    'avatarIniciales': avatarIniciales,
+  };
+
+  factory Usuario.fromMap(Map<String, dynamic> map, String docId) =>
+    Usuario(
+      id: docId,
+      nombre: map['nombre'] ?? '',
+      email: map['email'] ?? '',
+      password: '',
+      rol: RolUsuario.values.firstWhere(
+        (r) => r.name == map['rol'],
+        orElse: () => RolUsuario.enfermera,
+      ),
+      activo: map['activo'] ?? true,
+      avatarIniciales: map['avatarIniciales'] ?? '',
+    );
 }
 
 class Terapeuta {
@@ -78,6 +103,25 @@ class Terapeuta {
     required this.disponible,
     required this.usuarioId,
   });
+
+  Map<String, dynamic> toMap() => {
+    'nombre': nombre,
+    'especialidad': especialidad.name,
+    'disponible': disponible,
+    'usuarioId': usuarioId,
+  };
+
+  factory Terapeuta.fromMap(Map<String, dynamic> map, String docId) =>
+    Terapeuta(
+      id: docId,
+      nombre: map['nombre'] ?? '',
+      especialidad: EspecialidadTerapeuta.values.firstWhere(
+        (e) => e.name == map['especialidad'],
+        orElse: () => EspecialidadTerapeuta.masajista,
+      ),
+      disponible: map['disponible'] ?? true,
+      usuarioId: map['usuarioId'] ?? '',
+    );
 }
 
 class Patient {
@@ -110,6 +154,39 @@ class Patient {
     required this.registradoPor,
     this.fotoUrl,
   });
+
+  Map<String, dynamic> toMap() => {
+    'nombre': nombre,
+    'expediente': expediente,
+    'dpi': dpi,
+    'telefono': telefono,
+    'fechaNacimiento': fechaNacimiento,
+    'edad': edad,
+    'tipoSangre': tipoSangre,
+    'alergias': alergias,
+    'condicionesBase': condicionesBase,
+    'medicamentosActuales': medicamentosActuales,
+    'fotoUrl': fotoUrl ?? '',
+    'registradoPor': registradoPor,
+    'creadoEn': FieldValue.serverTimestamp(),
+  };
+
+  factory Patient.fromMap(Map<String, dynamic> map, String docId) =>
+    Patient(
+      id: docId,
+      nombre: map['nombre'] ?? '',
+      expediente: map['expediente'] ?? '',
+      dpi: map['dpi'] ?? '',
+      telefono: map['telefono'] ?? '',
+      fechaNacimiento: map['fechaNacimiento'] ?? '',
+      edad: map['edad'] ?? 0,
+      tipoSangre: map['tipoSangre'] ?? '',
+      alergias: List<String>.from(map['alergias'] ?? []),
+      condicionesBase: List<String>.from(map['condicionesBase'] ?? []),
+      medicamentosActuales: List<String>.from(map['medicamentosActuales'] ?? []),
+      fotoUrl: map['fotoUrl'],
+      registradoPor: map['registradoPor'] ?? '',
+    );
 }
 
 class Sala {
@@ -124,6 +201,23 @@ class Sala {
     required this.tipo,
     required this.disponible,
   });
+
+  Map<String, dynamic> toMap() => {
+    'nombre': nombre,
+    'tipo': tipo.name,
+    'disponible': disponible,
+  };
+
+  factory Sala.fromMap(Map<String, dynamic> map, String docId) =>
+    Sala(
+      id: docId,
+      nombre: map['nombre'] ?? '',
+      tipo: TipoSala.values.firstWhere(
+        (t) => t.name == map['tipo'],
+        orElse: () => TipoSala.sala_masajes,
+      ),
+      disponible: map['disponible'] ?? true,
+    );
 }
 
 class Appointment {
@@ -152,6 +246,41 @@ class Appointment {
     required this.estado,
     this.notas,
   });
+
+  Map<String, dynamic> toMap() => {
+    'pacienteId': pacienteId,
+    'terapeutaId': terapeutaId,
+    'salaId': salaId,
+    'tipoServicio': tipoServicio.name,
+    'fecha': Timestamp.fromDate(fecha),
+    'hora': hora,
+    'duracionMinutos': duracionMinutos,
+    'precioBase': precioBase,
+    'estado': estado.name,
+    'notas': notas ?? '',
+    'creadoEn': FieldValue.serverTimestamp(),
+  };
+
+  factory Appointment.fromMap(Map<String, dynamic> map, String docId) =>
+    Appointment(
+      id: docId,
+      pacienteId: map['pacienteId'] ?? '',
+      terapeutaId: map['terapeutaId'] ?? '',
+      salaId: map['salaId'] ?? '',
+      tipoServicio: TipoServicio.values.firstWhere(
+        (t) => t.name == map['tipoServicio'],
+        orElse: () => TipoServicio.masaje,
+      ),
+      fecha: (map['fecha'] as Timestamp).toDate(),
+      hora: map['hora'] ?? '',
+      duracionMinutos: map['duracionMinutos'] ?? 60,
+      precioBase: (map['precioBase'] ?? 0).toDouble(),
+      estado: EstadoCita.values.firstWhere(
+        (e) => e.name == map['estado'],
+        orElse: () => EstadoCita.agendada,
+      ),
+      notas: map['notas'],
+    );
 }
 
 class SesionTerapia {
@@ -180,6 +309,35 @@ class SesionTerapia {
     required this.registradaPor,
     this.fechaHoraFin,
   });
+
+  Map<String, dynamic> toMap() => {
+    'citaId': citaId,
+    'pacienteId': pacienteId,
+    'terapeutaId': terapeutaId,
+    'fechaHoraInicio': Timestamp.fromDate(fechaHoraInicio),
+    'fechaHoraFin': fechaHoraFin != null ? Timestamp.fromDate(fechaHoraFin!) : null,
+    'observaciones': observaciones,
+    'tecnicasUsadas': tecnicasUsadas,
+    'evolucion': evolucion,
+    'proximaSesionRecomendada': proximaSesionRecomendada,
+    'registradaPor': registradaPor,
+    'creadoEn': FieldValue.serverTimestamp(),
+  };
+
+  factory SesionTerapia.fromMap(Map<String, dynamic> map, String docId) =>
+    SesionTerapia(
+      id: docId,
+      citaId: map['citaId'] ?? '',
+      pacienteId: map['pacienteId'] ?? '',
+      terapeutaId: map['terapeutaId'] ?? '',
+      fechaHoraInicio: (map['fechaHoraInicio'] as Timestamp).toDate(),
+      fechaHoraFin: map['fechaHoraFin'] != null ? (map['fechaHoraFin'] as Timestamp).toDate() : null,
+      observaciones: map['observaciones'] ?? '',
+      tecnicasUsadas: List<String>.from(map['tecnicasUsadas'] ?? []),
+      evolucion: map['evolucion'] ?? 0,
+      proximaSesionRecomendada: map['proximaSesionRecomendada'] ?? '',
+      registradaPor: map['registradaPor'] ?? '',
+    );
 }
 
 class PlanTratamiento {
@@ -202,10 +360,33 @@ class PlanTratamiento {
     required this.fechaInicio,
     required this.activo,
   });
+
+  Map<String, dynamic> toMap() => {
+    'pacienteId': pacienteId,
+    'diagnostico': diagnostico,
+    'totalSesiones': totalSesiones,
+    'sesionesCompletadas': sesionesCompletadas,
+    'objetivo': objetivo,
+    'fechaInicio': fechaInicio,
+    'activo': activo,
+    'creadoEn': FieldValue.serverTimestamp(),
+  };
+
+  factory PlanTratamiento.fromMap(Map<String, dynamic> map, String docId) =>
+    PlanTratamiento(
+      id: docId,
+      pacienteId: map['pacienteId'] ?? '',
+      diagnostico: map['diagnostico'] ?? '',
+      totalSesiones: map['totalSesiones'] ?? 0,
+      sesionesCompletadas: map['sesionesCompletadas'] ?? 0,
+      objetivo: map['objetivo'] ?? '',
+      fechaInicio: map['fechaInicio'] ?? '',
+      activo: map['activo'] ?? true,
+    );
 }
 
 // ============================================================================
-// MOCK DATA
+// MOCK DATA (kept for reference/fallback)
 // ============================================================================
 
 final List<Usuario> mockUsuarios = [

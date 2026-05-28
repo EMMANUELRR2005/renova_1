@@ -14,9 +14,8 @@ class DashboardScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final kpiData = ref.watch(kpiDataProvider);
-    final citasHoy = ref.watch(citasHoyProvider);
-    final citasList = citasHoy.take(5).toList();
+    final kpiData = ref.watch(kpiProvider);
+    final citasHoyAsync = ref.watch(citasHoyStreamProvider);
 
     return AppShell(
       selectedIndex: 0,
@@ -87,138 +86,181 @@ class DashboardScreen extends ConsumerWidget {
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Panel izquierdo - Últimos ingresos
+                // Panel izquierdo - Próximas citas
                 Expanded(
                   flex: 60,
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: AppColors.card,
-                      border: Border.all(color: AppColors.border),
-                      borderRadius: BorderRadius.circular(10),
+                  child: citasHoyAsync.when(
+                    loading: () => Container(
+                      decoration: BoxDecoration(
+                        color: AppColors.card,
+                        border: Border.all(color: AppColors.border),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      padding: const EdgeInsets.all(16),
+                      child: const Center(
+                        child: CircularProgressIndicator(),
+                      ),
                     ),
-                    child: Column(
-                      children: [
-                        // Header tabla
-                        Container(
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            color: AppColors.bgGeneral,
-                            borderRadius: const BorderRadius.only(
-                              topLeft: Radius.circular(10),
-                              topRight: Radius.circular(10),
-                            ),
-                          ),
-                          child: Row(
-                            children: [
-                              Text(
-                                'PRÓXIMAS CITAS',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w600,
-                                  color: AppColors.textPrimary,
-                                  fontFamily: GoogleFonts.dmSans().fontFamily,
-                                  letterSpacing: 0.5,
+                    error: (error, stack) => Container(
+                      decoration: BoxDecoration(
+                        color: AppColors.card,
+                        border: Border.all(color: AppColors.border),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      padding: const EdgeInsets.all(16),
+                      child: Center(
+                        child: Text(
+                          'Error: $error',
+                          style: const TextStyle(color: AppColors.danger),
+                        ),
+                      ),
+                    ),
+                    data: (citas) {
+                      final citasList = citas.take(5).toList();
+                      return Container(
+                        decoration: BoxDecoration(
+                          color: AppColors.card,
+                          border: Border.all(color: AppColors.border),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Column(
+                          children: [
+                            // Header tabla
+                            Container(
+                              padding: const EdgeInsets.all(16),
+                              decoration: BoxDecoration(
+                                color: AppColors.bgGeneral,
+                                borderRadius: const BorderRadius.only(
+                                  topLeft: Radius.circular(10),
+                                  topRight: Radius.circular(10),
                                 ),
                               ),
-                            ],
-                          ),
-                        ),
-                        // Tabla de citas
-                        ...citasList.asMap().entries.map((entry) {
-                          final index = entry.key;
-                          final cita = entry.value;
-                          final isEven = index % 2 == 0;
-
-                          return Container(
-                            color: isEven
-                                ? Colors.white
-                                : const Color(0xFFFAFBFC),
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 12,
-                            ),
-                            child: Row(
-                              children: [
-                                Expanded(
-                                  flex: 15,
-                                  child: Text(
-                                    cita.hora,
+                              child: Row(
+                                children: [
+                                  Text(
+                                    'PRÓXIMAS CITAS',
                                     style: TextStyle(
                                       fontSize: 12,
-                                      fontWeight: FontWeight.w500,
-                                      color: AppColors.primary,
-                                      fontFamily:
-                                          GoogleFonts.dmSans().fontFamily,
-                                    ),
-                                  ),
-                                ),
-                                Expanded(
-                                  flex: 25,
-                                  child: Text(
-                                    'Cita ${cita.id}',
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w500,
+                                      fontWeight: FontWeight.w600,
                                       color: AppColors.textPrimary,
-                                      fontFamily:
-                                          GoogleFonts.dmSans().fontFamily,
-                                    ),
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                                Expanded(
-                                  flex: 20,
-                                  child: Text(
-                                    cita.tipoServicio.toString().split('.').last,
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w400,
-                                      color: AppColors.textSecondary,
-                                      fontFamily:
-                                          GoogleFonts.dmSans().fontFamily,
+                                      fontFamily: GoogleFonts.dmSans().fontFamily,
+                                      letterSpacing: 0.5,
                                     ),
                                   ),
-                                ),
-                                Expanded(
-                                  flex: 20,
-                                  child: Text(
-                                    'Terapeuta',
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w400,
-                                      color: AppColors.textSecondary,
-                                      fontFamily:
-                                          GoogleFonts.dmSans().fontFamily,
-                                    ),
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                                Expanded(
-                                  flex: 12,
-                                  child: StatusBadge(
-                                    status: _estadoToCita(cita.estado),
-                                    fontSize: 11,
-                                  ),
-                                ),
-                                Expanded(
-                                  flex: 12,
-                                  child: Text(
-                                    'Q${cita.precioBase.toStringAsFixed(0)}',
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w400,
-                                      color: AppColors.textSecondary,
-                                      fontFamily:
-                                          GoogleFonts.dmSans().fontFamily,
-                                    ),
-                                  ),
-                                ),
-                              ],
+                                ],
+                              ),
                             ),
-                          );
-                        }).toList(),
-                      ],
-                    ),
+                            // Tabla de citas
+                            if (citasList.isEmpty)
+                              Padding(
+                                padding: const EdgeInsets.all(16),
+                                child: Text(
+                                  'No hay citas para hoy',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: AppColors.textSecondary,
+                                    fontFamily: GoogleFonts.dmSans().fontFamily,
+                                  ),
+                                ),
+                              )
+                            else
+                              ...citasList.asMap().entries.map((entry) {
+                                final index = entry.key;
+                                final cita = entry.value;
+                                final isEven = index % 2 == 0;
+
+                                return Container(
+                                  color: isEven
+                                      ? Colors.white
+                                      : const Color(0xFFFAFBFC),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 16,
+                                    vertical: 12,
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      Expanded(
+                                        flex: 15,
+                                        child: Text(
+                                          cita.hora,
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w500,
+                                            color: AppColors.primary,
+                                            fontFamily:
+                                                GoogleFonts.dmSans().fontFamily,
+                                          ),
+                                        ),
+                                      ),
+                                      Expanded(
+                                        flex: 25,
+                                        child: Text(
+                                          'Cita ${cita.id}',
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w500,
+                                            color: AppColors.textPrimary,
+                                            fontFamily:
+                                                GoogleFonts.dmSans().fontFamily,
+                                          ),
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                      Expanded(
+                                        flex: 20,
+                                        child: Text(
+                                          cita.tipoServicio.toString().split('.').last,
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w400,
+                                            color: AppColors.textSecondary,
+                                            fontFamily:
+                                                GoogleFonts.dmSans().fontFamily,
+                                          ),
+                                        ),
+                                      ),
+                                      Expanded(
+                                        flex: 20,
+                                        child: Text(
+                                          'Terapeuta',
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w400,
+                                            color: AppColors.textSecondary,
+                                            fontFamily:
+                                                GoogleFonts.dmSans().fontFamily,
+                                          ),
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                      Expanded(
+                                        flex: 12,
+                                        child: StatusBadge(
+                                          status: _estadoToCita(cita.estado),
+                                          fontSize: 11,
+                                        ),
+                                      ),
+                                      Expanded(
+                                        flex: 12,
+                                        child: Text(
+                                          'Q${cita.precioBase.toStringAsFixed(0)}',
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w400,
+                                            color: AppColors.textSecondary,
+                                            fontFamily:
+                                                GoogleFonts.dmSans().fontFamily,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              }).toList(),
+                          ],
+                        ),
+                      );
+                    },
                   ),
                 ),
                 const SizedBox(width: 20),

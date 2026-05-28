@@ -11,7 +11,7 @@ class AgendaTerapeutaScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final citasHoy = ref.watch(citasHoyProvider);
+    final citasAsync = ref.watch(citasTerapeutaProvider);
 
     return AppShell(
       selectedIndex: 0,
@@ -31,144 +31,171 @@ class AgendaTerapeutaScreen extends ConsumerWidget {
               ),
             ),
             const SizedBox(height: 20),
-            Container(
-              decoration: BoxDecoration(
-                color: AppColors.card,
-                border: Border.all(color: AppColors.border),
-                borderRadius: BorderRadius.circular(10),
+            citasAsync.when(
+              loading: () => Container(
+                decoration: BoxDecoration(
+                  color: AppColors.card,
+                  border: Border.all(color: AppColors.border),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                padding: const EdgeInsets.all(16),
+                child: const Center(
+                  child: CircularProgressIndicator(),
+                ),
               ),
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                children: [
-                  if (citasHoy.isEmpty)
-                    const Padding(
-                      padding: EdgeInsets.all(20),
-                      child: Text('No tienes citas programadas hoy'),
-                    )
-                  else
-                    ListView.builder(
-                      shrinkWrap: true,
-                      itemCount: citasHoy.length,
-                      itemBuilder: (context, index) {
-                        final cita = citasHoy[index];
-                        return Container(
-                          padding: const EdgeInsets.all(16),
-                          margin: const EdgeInsets.only(bottom: 12),
-                          decoration: BoxDecoration(
-                            border: Border.all(color: AppColors.border),
-                            borderRadius: BorderRadius.circular(8),
-                            color: cita.estado.toString() == 'EstadoCita.en_curso'
-                                ? AppColors.primaryLight
-                                : Colors.white,
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        cita.hora,
-                                        style: const TextStyle(
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.w700,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 4),
-                                      Text(
-                                        'Servicio: ${cita.tipoServicio.toString().split('.').last}',
-                                        style: TextStyle(
-                                          fontSize: 12,
-                                          color: AppColors.textSecondary,
-                                          fontFamily:
-                                              GoogleFonts.dmSans().fontFamily,
-                                        ),
-                                      ),
-                                      Text(
-                                        'Sala: ${cita.salaId}',
-                                        style: TextStyle(
-                                          fontSize: 12,
-                                          color: AppColors.textSecondary,
-                                          fontFamily:
-                                              GoogleFonts.dmSans().fontFamily,
-                                        ),
-                                      ),
-                                      Text(
-                                        'Duración: ${cita.duracionMinutos} minutos',
-                                        style: TextStyle(
-                                          fontSize: 12,
-                                          color: AppColors.textSecondary,
-                                          fontFamily:
-                                              GoogleFonts.dmSans().fontFamily,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  Column(
-                                    crossAxisAlignment: CrossAxisAlignment.end,
-                                    children: [
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 8,
-                                          vertical: 4,
-                                        ),
-                                        decoration: BoxDecoration(
-                                          color: cita.estado.toString() ==
-                                                  'EstadoCita.confirmada'
-                                              ? AppColors.successBg
-                                              : AppColors.warningBg,
-                                          borderRadius: BorderRadius.circular(4),
-                                        ),
-                                        child: Text(
-                                          cita.estado
-                                              .toString()
-                                              .split('.')
-                                              .last,
-                                          style: const TextStyle(fontSize: 10),
-                                        ),
-                                      ),
-                                      const SizedBox(height: 8),
-                                      if (cita.estado.toString() !=
-                                          'EstadoCita.completada')
-                                        ElevatedButton(
-                                          onPressed: () {
-                                            _showSessionForm(context);
-                                          },
-                                          style: ElevatedButton.styleFrom(
-                                            backgroundColor: AppColors.primary,
-                                          ),
-                                          child: const Text(
-                                            'Registrar Sesión',
-                                            style: TextStyle(fontSize: 11),
+              error: (error, stackTrace) => Container(
+                decoration: BoxDecoration(
+                  color: AppColors.card,
+                  border: Border.all(color: AppColors.border),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                padding: const EdgeInsets.all(16),
+                child: Center(
+                  child: Text(
+                    'Error cargando citas: $error',
+                    style: const TextStyle(color: AppColors.danger),
+                  ),
+                ),
+              ),
+              data: (citasHoy) => Container(
+                decoration: BoxDecoration(
+                  color: AppColors.card,
+                  border: Border.all(color: AppColors.border),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  children: [
+                    if (citasHoy.isEmpty)
+                      const Padding(
+                        padding: EdgeInsets.all(20),
+                        child: Text('No tienes citas programadas hoy'),
+                      )
+                    else
+                      ListView.builder(
+                        shrinkWrap: true,
+                        itemCount: citasHoy.length,
+                        itemBuilder: (context, index) {
+                          final cita = citasHoy[index];
+                          return Container(
+                            padding: const EdgeInsets.all(16),
+                            margin: const EdgeInsets.only(bottom: 12),
+                            decoration: BoxDecoration(
+                              border: Border.all(color: AppColors.border),
+                              borderRadius: BorderRadius.circular(8),
+                              color: cita.estado.toString() == 'EstadoCita.en_curso'
+                                  ? AppColors.primaryLight
+                                  : Colors.white,
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          cita.hora,
+                                          style: const TextStyle(
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.w700,
                                           ),
                                         ),
-                                    ],
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          'Servicio: ${cita.tipoServicio.toString().split('.').last}',
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            color: AppColors.textSecondary,
+                                            fontFamily:
+                                                GoogleFonts.dmSans().fontFamily,
+                                          ),
+                                        ),
+                                        Text(
+                                          'Sala: ${cita.salaId}',
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            color: AppColors.textSecondary,
+                                            fontFamily:
+                                                GoogleFonts.dmSans().fontFamily,
+                                          ),
+                                        ),
+                                        Text(
+                                          'Duración: ${cita.duracionMinutos} minutos',
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            color: AppColors.textSecondary,
+                                            fontFamily:
+                                                GoogleFonts.dmSans().fontFamily,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    Column(
+                                      crossAxisAlignment: CrossAxisAlignment.end,
+                                      children: [
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 8,
+                                            vertical: 4,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: cita.estado.toString() ==
+                                                    'EstadoCita.confirmada'
+                                                ? AppColors.successBg
+                                                : AppColors.warningBg,
+                                            borderRadius: BorderRadius.circular(4),
+                                          ),
+                                          child: Text(
+                                            cita.estado
+                                                .toString()
+                                                .split('.')
+                                                .last,
+                                            style: const TextStyle(fontSize: 10),
+                                          ),
+                                        ),
+                                        const SizedBox(height: 8),
+                                        if (cita.estado.toString() !=
+                                            'EstadoCita.completada')
+                                          ElevatedButton(
+                                            onPressed: () {
+                                              _showSessionForm(context);
+                                            },
+                                            style: ElevatedButton.styleFrom(
+                                              backgroundColor: AppColors.primary,
+                                            ),
+                                            child: const Text(
+                                              'Registrar Sesión',
+                                              style: TextStyle(fontSize: 11),
+                                            ),
+                                          ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                                if (cita.notas != null) ...[
+                                  const SizedBox(height: 12),
+                                  Container(
+                                    padding: const EdgeInsets.all(8),
+                                    decoration: BoxDecoration(
+                                      color: AppColors.bgGeneral,
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                    child: Text(
+                                      'Notas: ${cita.notas}',
+                                      style: const TextStyle(fontSize: 11),
+                                    ),
                                   ),
                                 ],
-                              ),
-                              if (cita.notas != null) ...[
-                                const SizedBox(height: 12),
-                                Container(
-                                  padding: const EdgeInsets.all(8),
-                                  decoration: BoxDecoration(
-                                    color: AppColors.bgGeneral,
-                                    borderRadius: BorderRadius.circular(4),
-                                  ),
-                                  child: Text(
-                                    'Notas: ${cita.notas}',
-                                    style: const TextStyle(fontSize: 11),
-                                  ),
-                                ),
                               ],
-                            ],
-                          ),
-                        );
-                      },
-                    ),
-                ],
+                            ),
+                          );
+                        },
+                      ),
+                  ],
+                ),
               ),
             ),
           ],

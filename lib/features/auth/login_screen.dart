@@ -49,34 +49,48 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     setState(() => _isLoading = true);
 
     try {
-      // Buscar usuario en mockUsuarios
-      final usuario = mockUsuarios.firstWhere(
-        (u) => u.email == _emailController.text && 
-               u.password == _passwordController.text && 
-               u.activo,
-        orElse: () => throw Exception('Credenciales inválidas'),
-      );
-
-      // Establecer usuario activo
-      ref.read(usuarioActivoProvider.notifier).state = usuario;
+      final result = await ref.read(loginProvider((_emailController.text, _passwordController.text)).future);
       
-      // Invalidar router para que reacte al cambio
-      ref.invalidate(goRouterProvider);
-      
-      if (mounted) {
-        // La redirección se hace automáticamente por el router
-        // según el rol del usuario
-        await Future.delayed(const Duration(milliseconds: 300));
+      if (result) {
+        // Invalidar router para que reacte al cambio
+        ref.invalidate(goRouterProvider);
+        
         if (mounted) {
-          context.go(_getRutaInicial(usuario.rol));
+          final usuario = ref.read(usuarioActivoProvider);
+          if (usuario != null) {
+            await Future.delayed(const Duration(milliseconds: 300));
+            if (mounted) {
+              context.go(_getRutaInicial(usuario.rol));
+            }
+          }
+        }
+      } else {
+        if (mounted) {
+          setState(() => _isLoading = false);
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Credenciales inválidas o usuario desactivado'),
+              backgroundColor: AppColors.danger,
+            ),
+          );
         }
       }
     } catch (e) {
       if (mounted) {
         setState(() => _isLoading = false);
+        String mensajeError = 'Error al iniciar sesión';
+        
+        if (e.toString().contains('user-not-found')) {
+          mensajeError = 'Usuario no encontrado';
+        } else if (e.toString().contains('wrong-password')) {
+          mensajeError = 'Contraseña incorrecta';
+        } else if (e.toString().contains('user-disabled')) {
+          mensajeError = 'Usuario desactivado';
+        }
+        
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Credenciales inválidas'),
+          SnackBar(
+            content: Text(mensajeError),
             backgroundColor: AppColors.danger,
           ),
         );
@@ -286,9 +300,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         ),
                       ),
                       const SizedBox(height: 12),
-                      _buildCredentialDemo('Admin', 'admin@renova.gt', '1234'),
-                      _buildCredentialDemo('Enfermera', 'carmen@renova.gt', '1234'),
-                      _buildCredentialDemo('Terapeuta', 'luis@renova.gt', '1234'),
+                      _buildCredentialDemo('Admin', 'admin@renova.gt', 'renova2024'),
+                      _buildCredentialDemo('Enfermera', 'carmen@renova.gt', 'renova2024'),
+                      _buildCredentialDemo('Terapeuta', 'luis@renova.gt', 'renova2024'),
                       const SizedBox(height: 16),
                       Center(
                         child: Text(

@@ -11,7 +11,7 @@ class PatientsScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final patients = ref.watch(patientsProvider);
+    final patientsAsync = ref.watch(pacientesStreamProvider);
 
     return AppShell(
       selectedIndex: 1,
@@ -31,140 +31,180 @@ class PatientsScreen extends ConsumerWidget {
               ),
             ),
             const SizedBox(height: 20),
-            Container(
-              decoration: BoxDecoration(
-                color: AppColors.card,
-                border: Border.all(color: AppColors.border),
-                borderRadius: BorderRadius.circular(10),
+            patientsAsync.when(
+              loading: () => Container(
+                decoration: BoxDecoration(
+                  color: AppColors.card,
+                  border: Border.all(color: AppColors.border),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                padding: const EdgeInsets.all(16),
+                child: const Center(
+                  child: CircularProgressIndicator(),
+                ),
               ),
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                children: [
-                  // Encabezado
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: AppColors.bgGeneral,
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          flex: 20,
-                          child: Text(
-                            'DPI',
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              color: AppColors.textPrimary,
-                              fontFamily: GoogleFonts.dmSans().fontFamily,
-                            ),
-                          ),
-                        ),
-                        Expanded(
-                          flex: 30,
-                          child: Text(
-                            'Nombre',
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              color: AppColors.textPrimary,
-                              fontFamily: GoogleFonts.dmSans().fontFamily,
-                            ),
-                          ),
-                        ),
-                        Expanded(
-                          flex: 20,
-                          child: Text(
-                            'Teléfono',
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              color: AppColors.textPrimary,
-                              fontFamily: GoogleFonts.dmSans().fontFamily,
-                            ),
-                          ),
-                        ),
-                        Expanded(
-                          flex: 15,
-                          child: Text(
-                            'Tipo Sangre',
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              color: AppColors.textPrimary,
-                              fontFamily: GoogleFonts.dmSans().fontFamily,
-                            ),
-                          ),
-                        ),
-                        Expanded(
-                          flex: 15,
-                          child: Text(
-                            'Edad',
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              color: AppColors.textPrimary,
-                              fontFamily: GoogleFonts.dmSans().fontFamily,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
+              error: (error, stackTrace) => Container(
+                decoration: BoxDecoration(
+                  color: AppColors.card,
+                  border: Border.all(color: AppColors.border),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                padding: const EdgeInsets.all(16),
+                child: Center(
+                  child: Text(
+                    'Error cargando pacientes: $error',
+                    style: const TextStyle(color: AppColors.danger),
                   ),
-                  const SizedBox(height: 12),
-                  // Filas de pacientes
-                  ...patients.map((patient) {
-                    return Container(
+                ),
+              ),
+              data: (patients) => Container(
+                decoration: BoxDecoration(
+                  color: AppColors.card,
+                  border: Border.all(color: AppColors.border),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  children: [
+                    // Encabezado
+                    Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        border: Border(
-                          bottom: BorderSide(color: AppColors.border),
-                        ),
+                        color: AppColors.bgGeneral,
+                        borderRadius: BorderRadius.circular(6),
                       ),
                       child: Row(
                         children: [
                           Expanded(
                             flex: 20,
                             child: Text(
-                              patient.dpi,
-                              style: const TextStyle(fontSize: 12),
+                              'DPI',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.textPrimary,
+                                fontFamily: GoogleFonts.dmSans().fontFamily,
+                              ),
                             ),
                           ),
                           Expanded(
                             flex: 30,
                             child: Text(
-                              patient.nombre,
-                              style: const TextStyle(fontSize: 12),
-                              overflow: TextOverflow.ellipsis,
+                              'Nombre',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.textPrimary,
+                                fontFamily: GoogleFonts.dmSans().fontFamily,
+                              ),
                             ),
                           ),
                           Expanded(
                             flex: 20,
                             child: Text(
-                              patient.telefono,
-                              style: const TextStyle(fontSize: 12),
+                              'Teléfono',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.textPrimary,
+                                fontFamily: GoogleFonts.dmSans().fontFamily,
+                              ),
                             ),
                           ),
                           Expanded(
                             flex: 15,
                             child: Text(
-                              patient.tipoSangre,
-                              style: const TextStyle(fontSize: 12),
+                              'Tipo Sangre',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.textPrimary,
+                                fontFamily: GoogleFonts.dmSans().fontFamily,
+                              ),
                             ),
                           ),
                           Expanded(
                             flex: 15,
                             child: Text(
-                              '${patient.edad}',
-                              style: const TextStyle(fontSize: 12),
+                              'Edad',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.textPrimary,
+                                fontFamily: GoogleFonts.dmSans().fontFamily,
+                              ),
                             ),
                           ),
                         ],
                       ),
-                    );
-                  }).toList(),
-                ],
+                    ),
+                    const SizedBox(height: 12),
+                    // Filas de pacientes
+                    if (patients.isEmpty)
+                      Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Text(
+                          'No hay pacientes registrados',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: AppColors.textSecondary,
+                            fontFamily: GoogleFonts.dmSans().fontFamily,
+                          ),
+                        ),
+                      )
+                    else
+                      ...patients.map((patient) {
+                        return Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            border: Border(
+                              bottom: BorderSide(color: AppColors.border),
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                flex: 20,
+                                child: Text(
+                                  patient.dpi,
+                                  style: const TextStyle(fontSize: 12),
+                                ),
+                              ),
+                              Expanded(
+                                flex: 30,
+                                child: Text(
+                                  patient.nombre,
+                                  style: const TextStyle(fontSize: 12),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              Expanded(
+                                flex: 20,
+                                child: Text(
+                                  patient.telefono,
+                                  style: const TextStyle(fontSize: 12),
+                                ),
+                              ),
+                              Expanded(
+                                flex: 15,
+                                child: Text(
+                                  patient.tipoSangre,
+                                  style: const TextStyle(fontSize: 12),
+                                ),
+                              ),
+                              Expanded(
+                                flex: 15,
+                                child: Text(
+                                  '${patient.edad}',
+                                  style: const TextStyle(fontSize: 12),
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      }).toList(),
+                  ],
+                ),
               ),
             ),
           ],
