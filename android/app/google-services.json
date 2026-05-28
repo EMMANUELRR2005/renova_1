@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "789106628921",
+    "project_id": "renova-8c366",
+    "storage_bucket": "renova-8c366.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:789106628921:android:5440d5721773e85c6cb0e8",
+        "android_client_info": {
+          "package_name": "com.example.renova_1"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCZKASFmGIz6XM5nNPAP6xhRM06XDPGsDE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
