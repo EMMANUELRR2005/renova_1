@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -12,7 +13,20 @@ import 'firebase_options.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-  await SeedService().seedTodo();
+
+  // Limpiar caché local corrupto de Firestore (problema conocido con SPM + Firebase iOS SDK 11.x)
+  try {
+    await FirebaseFirestore.instance.clearPersistence();
+    print('✅ [Main] Caché Firestore limpiada');
+  } catch (e) {
+    print('⚠️ [Main] clearPersistence: $e');
+  }
+
+  // Seed en background — no bloquea el arranque aunque Firestore tarde
+  SeedService().seedTodo().catchError((e) {
+    // ignore: avoid_print
+    print('⚠️ [Main] Seed falló pero la app continúa: $e');
+  });
 
   // Bloquear orientación a landscape (solo en mobile/desktop real)
   try {
@@ -28,6 +42,7 @@ void main() async {
 
   runApp(const ProviderScope(child: MainApp()));
 }
+
 
 class MainApp extends ConsumerWidget {
   const MainApp({super.key});

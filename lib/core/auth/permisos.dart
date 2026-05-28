@@ -1,74 +1,64 @@
 import '../../data/mock/mock_data.dart';
 
 class Permisos {
-  /// Administradora puede ver finanzas, cobros y reportes
-  static bool puedeVerFinanzas(RolUsuario? rol) {
-    return rol == RolUsuario.administradora;
-  }
+  static bool puedeVerFinanzas(RolUsuario? rol) =>
+      rol == RolUsuario.administradora;
 
-  /// Solo administradora puede eliminar pacientes, usuarios o citas
-  static bool puedeEliminar(RolUsuario? rol) {
-    return rol == RolUsuario.administradora;
-  }
+  static bool puedeEliminar(RolUsuario? rol) =>
+      rol == RolUsuario.administradora;
 
-  /// Administradora y enfermera pueden ver expedientes de pacientes
-  static bool puedeVerExpedientes(RolUsuario? rol) {
-    return rol == RolUsuario.administradora || rol == RolUsuario.enfermera;
-  }
+  static bool puedeVerExpedientes(RolUsuario? rol) =>
+      rol == RolUsuario.administradora || rol == RolUsuario.enfermera;
 
-  /// Todos menos administradora pueden registrar notas de sesión
-  /// Administradora también puede registrar notas
-  static bool puedeRegistrarNotas(RolUsuario? rol) {
-    return rol != null;
-  }
+  static bool puedeRegistrarNotas(RolUsuario? rol) => rol != null;
 
-  /// Administradora y enfermera pueden agendar citas
-  static bool puedeAgendarCitas(RolUsuario? rol) {
-    return rol == RolUsuario.administradora || rol == RolUsuario.enfermera;
-  }
+  static bool puedeAgendarCitas(RolUsuario? rol) =>
+      rol == RolUsuario.administradora ||
+      rol == RolUsuario.enfermera ||
+      rol == RolUsuario.secretaria_recepcion;
 
-  /// Administradora y enfermera pueden crear pacientes
-  static bool puedeCrearPacientes(RolUsuario? rol) {
-    return rol == RolUsuario.administradora || rol == RolUsuario.enfermera;
-  }
+  // Gestión de pacientes (crear/editar datos): solo secretaria_recepcion
+  static bool puedeCrearPacientes(RolUsuario? rol) =>
+      rol == RolUsuario.secretaria_recepcion;
 
-  /// Solo administradora puede ver reportes y estadísticas
-  static bool puedeVerReportes(RolUsuario? rol) {
-    return rol == RolUsuario.administradora;
-  }
+  static bool puedeEditarPacientes(RolUsuario? rol) =>
+      rol == RolUsuario.secretaria_recepcion;
 
-  /// Solo administradora puede gestionar usuarios
-  static bool puedeGestionarUsuarios(RolUsuario? rol) {
-    return rol == RolUsuario.administradora;
-  }
+  // Ver lista y detalle: todos excepto terapeuta
+  static bool puedeVerListaPacientes(RolUsuario? rol) =>
+      rol == RolUsuario.administradora ||
+      rol == RolUsuario.enfermera ||
+      rol == RolUsuario.secretaria_recepcion ||
+      rol == RolUsuario.doctora;
 
-  /// Solo administradora puede acceder a la caja (cobros)
-  static bool puedeAccederCaja(RolUsuario? rol) {
-    return rol == RolUsuario.administradora;
-  }
+  // Agregar comentarios/notas: solo secretaria_recepcion
+  static bool puedeAgregarComentarios(RolUsuario? rol) =>
+      rol == RolUsuario.secretaria_recepcion;
 
-  /// Solo administradora puede ver y modificar precios
-  static bool puedeModificarPrecios(RolUsuario? rol) {
-    return rol == RolUsuario.administradora;
-  }
+  // Crear consultas médicas: doctora y enfermera
+  static bool puedeCrearConsultas(RolUsuario? rol) =>
+      rol == RolUsuario.doctora || rol == RolUsuario.enfermera;
 
-  /// Todos los roles autenticados pueden ver dashboard según su rol
-  static bool puedeVerDashboard(RolUsuario? rol) {
-    return rol == RolUsuario.administradora;
-  }
+  static bool puedeVerReportes(RolUsuario? rol) =>
+      rol == RolUsuario.administradora;
 
-  /// Solo terapeuta puede ver su propia agenda
-  static bool puedeVerAgendaTerapeuta(RolUsuario? rol) {
-    return rol == RolUsuario.terapeuta;
-  }
+  static bool puedeGestionarUsuarios(RolUsuario? rol) =>
+      rol == RolUsuario.administradora;
 
-  /// Administradora y enfermera pueden ver lista de pacientes
-  static bool puedeVerListaPacientes(RolUsuario? rol) {
-    return rol == RolUsuario.administradora || rol == RolUsuario.enfermera;
-  }
+  static bool puedeAccederCaja(RolUsuario? rol) =>
+      rol == RolUsuario.administradora;
 
-  /// Administradora y enfermera pueden ver citas
-  static bool puedeVerCitas(RolUsuario? rol) {
-    return rol == RolUsuario.administradora || rol == RolUsuario.enfermera;
-  }
+  static bool puedeModificarPrecios(RolUsuario? rol) =>
+      rol == RolUsuario.administradora;
+
+  static bool puedeVerDashboard(RolUsuario? rol) =>
+      rol == RolUsuario.administradora;
+
+  static bool puedeVerAgendaTerapeuta(RolUsuario? rol) =>
+      rol == RolUsuario.terapeuta;
+
+  static bool puedeVerCitas(RolUsuario? rol) =>
+      rol == RolUsuario.administradora ||
+      rol == RolUsuario.enfermera ||
+      rol == RolUsuario.secretaria_recepcion;
 }

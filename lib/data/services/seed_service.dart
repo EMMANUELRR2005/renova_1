@@ -1,6 +1,7 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:firebase_core/firebase_core.dart';
 import '../mock/mock_data.dart';
 import 'auth_service.dart';
 
@@ -8,28 +9,33 @@ class SeedService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
   final FirebaseAuth _firebaseAuth = FirebaseAuth.instance;
 
-  /// Poblar Firestore con datos iniciales (ejecutar UNA SOLA VEZ)
+  /// Garantiza que el administrador exista en Auth y Firestore.
+  /// No usa app secundaria: el seed corre al arrancar sin sesión activa,
+  /// así que podemos usar el auth principal directamente sin interferir.
   Future<void> seedTodo() async {
     try {
-      // 1. Crear admin en Firebase Auth. Si ya existe, el seed ya corrió → abortar.
-      final adminUid = await _crearAdminEnAuth();
-      if (adminUid == null) {
-        print('Seed ya fue ejecutado anteriormente - abortando');
+      print('🔵 [Seed] Iniciando...');
+
+      // 1. Crear admin en auth principal o recuperar UID existente
+      final adminUid = await _crearOLoginAdmin();
+      print('✅ [Seed] Admin autenticado — UID: $adminUid');
+
+      // 2. Verificar si el seed ya corrió (documento del admin en Firestore)
+      final adminDoc = await _db
+          .collection('usuarios')
+          .doc(adminUid)
+          .get()
+          .timeout(const Duration(seconds: 10));
+
+      if (adminDoc.exists) {
+        print('✅ [Seed] Ya ejecutado anteriormente — omitiendo');
+        await _firebaseAuth.signOut();
         return;
       }
 
-      // 2. Iniciar sesión como admin (la regla de Firestore permite que un usuario
-      //    autenticado cree su propio documento, rompiendo el ciclo circular).
-      await _firebaseAuth.signInWithEmailAndPassword(
-        email: 'admin@renova.gt',
-        password: 'renova2024',
-      );
-      print('  ✓ Sesión de seed iniciada como admin');
-
-      // 3. Escribir el documento del admin en Firestore (ahora sí autenticado)
+      // 3. Firestore vacío → escribir datos iniciales
+      print('🔵 [Seed] Escribiendo datos iniciales...');
       await _escribirDocAdmin(adminUid);
-
-      // 4. Con el documento admin en Firestore, las demás escrituras están permitidas
       await _seedUsuarios();
       await _seedSalas();
       await _seedTerapeutas();
@@ -37,43 +43,47 @@ class SeedService {
       await _seedCitas();
       await _seedPlanes();
 
-      // 5. Cerrar sesión para dejar la app en estado limpio
       await _firebaseAuth.signOut();
+      print('✅ [Seed] Completado exitosamente');
 
-      print('✅ Seed completado exitosamente');
     } catch (e) {
-      print('❌ Error durante seed: $e');
+      print('❌ [Seed] Error: $e');
       await _firebaseAuth.signOut();
     }
   }
 
-  /// Crea el admin en Firebase Auth (sin Firestore todavía).
-  /// Retorna el UID si se creó, null si ya existía.
-  Future<String?> _crearAdminEnAuth() async {
-    const adminEmail = 'admin@renova.gt';
-    const adminPassword = 'renova2024';
+  /// Crea el admin en Firebase Auth o inicia sesión si ya existe.
+  /// Usa auth PRINCIPAL (no app secundaria) para no romper canales gRPC.
+  Future<String> _crearOLoginAdmin() async {
+    const email = 'admin@renova.gt';
+    const password = 'renova2024';
 
-    final secondaryApp = await Firebase.initializeApp(
-      name: 'seedApp_${DateTime.now().millisecondsSinceEpoch}',
-      options: Firebase.app().options,
-    );
     try {
-      final secondaryAuth = FirebaseAuth.instanceFor(app: secondaryApp);
-      final credential = await secondaryAuth.createUserWithEmailAndPassword(
-        email: adminEmail,
-        password: adminPassword,
+      final cred = await _firebaseAuth.signInWithEmailAndPassword(
+        email: email,
+        password: password,
       );
-      return credential.user!.uid;
+      return cred.user!.uid;
     } on FirebaseAuthException catch (e) {
-      if (e.code == 'email-already-in-use') return null;
+      if (e.code == 'user-not-found' ||
+          e.code == 'invalid-credential' ||
+          e.code == 'INVALID_LOGIN_CREDENTIALS') {
+        // Admin no existe → crear
+        final cred = await _firebaseAuth.createUserWithEmailAndPassword(
+          email: email,
+          password: password,
+        );
+        print('  ✓ Admin creado en Firebase Auth');
+        return cred.user!.uid;
+      }
       rethrow;
-    } finally {
-      await secondaryApp.delete();
     }
   }
 
-  /// Escribe el documento del admin en Firestore (requiere sesión activa como admin).
+
+  /// Escribe el documento del admin en Firestore.
   Future<void> _escribirDocAdmin(String uid) async {
+    print('  🔵 Escribiendo documento admin (uid: $uid)...');
     final usuario = Usuario(
       id: uid,
       nombre: 'Dra. Vania López',
@@ -84,7 +94,7 @@ class SeedService {
       avatarIniciales: 'VL',
     );
     await _db.collection('usuarios').doc(uid).set(usuario.toMap());
-    print('  ✓ Documento admin creado en Firestore');
+    print('  ✅ Documento admin creado — rol: administradora');
   }
 
   Future<void> _seedUsuarios() async {

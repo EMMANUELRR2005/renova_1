@@ -74,7 +74,7 @@ class AppShell extends ConsumerWidget {
                 Expanded(
                   child: ListView(
                     padding: EdgeInsets.zero,
-                    children: _buildSidebarItems(context, rol, onNavigate, selectedIndex),
+                    children: _buildSidebarItems(context, ref, rol, onNavigate, selectedIndex),
                   ),
                 ),
               ],
@@ -202,7 +202,7 @@ class AppShell extends ConsumerWidget {
   }
 
   List<Widget> _buildSidebarItems(
-      BuildContext context, RolUsuario? rol, Function(int) onNavigate, int selectedIndex) {
+      BuildContext context, WidgetRef ref, RolUsuario? rol, Function(int) onNavigate, int selectedIndex) {
     final items = <Widget>[];
 
     if (rol == RolUsuario.administradora) {
@@ -312,6 +312,47 @@ class AppShell extends ConsumerWidget {
           child: Divider(color: Color(0xFF1A3F5C)),
         ),
       ]);
+    } else if (rol == RolUsuario.secretaria_recepcion) {
+      items.addAll([
+        SidebarItem(
+          icon: '👥',
+          label: 'Pacientes',
+          isActive: selectedIndex == 0,
+          onTap: () {
+            onNavigate(0);
+            context.go('/pacientes');
+          },
+        ),
+        SidebarItem(
+          icon: '📅',
+          label: 'Citas',
+          isActive: selectedIndex == 1,
+          onTap: () {
+            onNavigate(1);
+            context.go('/citas');
+          },
+        ),
+        const Padding(
+          padding: EdgeInsets.symmetric(vertical: 8),
+          child: Divider(color: Color(0xFF1A3F5C)),
+        ),
+      ]);
+    } else if (rol == RolUsuario.doctora) {
+      items.addAll([
+        SidebarItem(
+          icon: '👥',
+          label: 'Pacientes',
+          isActive: selectedIndex == 0,
+          onTap: () {
+            onNavigate(0);
+            context.go('/pacientes');
+          },
+        ),
+        const Padding(
+          padding: EdgeInsets.symmetric(vertical: 8),
+          child: Divider(color: Color(0xFF1A3F5C)),
+        ),
+      ]);
     } else if (rol == RolUsuario.terapeuta) {
       items.addAll([
         SidebarItem(
@@ -336,8 +377,10 @@ class AppShell extends ConsumerWidget {
         icon: '🚪',
         label: 'Cerrar sesión',
         isActive: false,
-        onTap: () {
-          context.go('/login');
+        onTap: () async {
+          // Llama signOut() en Firebase Auth y limpia usuarioActivoProvider.
+          // GoRouter detecta authState = false y redirige a /login automáticamente.
+          await ref.read(logoutProvider)();
         },
       ),
     );
@@ -353,6 +396,10 @@ class AppShell extends ConsumerWidget {
         return 'Enfermera';
       case RolUsuario.terapeuta:
         return 'Terapeuta';
+      case RolUsuario.secretaria_recepcion:
+        return 'Secretaria';
+      case RolUsuario.doctora:
+        return 'Doctora';
       case null:
         return 'Sin rol';
     }

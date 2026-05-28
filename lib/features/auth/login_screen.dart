@@ -1,3 +1,4 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -35,66 +36,95 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     super.dispose();
   }
 
-  void _handleLogin() async {
+  Future<void> _handleLogin() async {
     if (_emailController.text.isEmpty || _passwordController.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Por favor completa todos los campos'),
-          backgroundColor: AppColors.danger,
-        ),
-      );
+      _showError('Por favor completa todos los campos');
       return;
     }
 
     setState(() => _isLoading = true);
 
     try {
-      final result = await ref.read(loginProvider((_emailController.text, _passwordController.text)).future);
-      
+      final result = await ref
+          .read(loginProvider((_emailController.text.trim(), _passwordController.text)).future);
+
       if (result) {
-        // Invalidar router para que reacte al cambio
-        ref.invalidate(goRouterProvider);
-        
         if (mounted) {
           final usuario = ref.read(usuarioActivoProvider);
           if (usuario != null) {
-            await Future.delayed(const Duration(milliseconds: 300));
-            if (mounted) {
-              context.go(_getRutaInicial(usuario.rol));
-            }
+            // Pequeño delay para que el router detecte el cambio de auth state
+            await Future.delayed(const Duration(milliseconds: 200));
+            if (mounted) context.go(_getRutaInicial(usuario.rol));
+          } else {
+            // Usuario autenticado en Firebase pero sin doc en Firestore
+            setState(() => _isLoading = false);
+            _showError('Cuenta no configurada. Contacta al administrador.');
           }
         }
       } else {
+        // login() devolvió null (doc no existe) o activo=false
         if (mounted) {
           setState(() => _isLoading = false);
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Credenciales inválidas o usuario desactivado'),
-              backgroundColor: AppColors.danger,
-            ),
-          );
+          _showError('Cuenta desactivada o no configurada.');
         }
+      }
+
+    } on FirebaseAuthException catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+        _showError(_mapAuthError(e.code));
+      }
+    } on FirebaseException catch (e) {
+      // Firestore errors: unavailable, permission-denied, etc.
+      if (mounted) {
+        setState(() => _isLoading = false);
+        _showError(_mapFirestoreError(e.code));
       }
     } catch (e) {
       if (mounted) {
         setState(() => _isLoading = false);
-        String mensajeError = 'Error al iniciar sesión';
-        
-        if (e.toString().contains('user-not-found')) {
-          mensajeError = 'Usuario no encontrado';
-        } else if (e.toString().contains('wrong-password')) {
-          mensajeError = 'Contraseña incorrecta';
-        } else if (e.toString().contains('user-disabled')) {
-          mensajeError = 'Usuario desactivado';
-        }
-        
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(mensajeError),
-            backgroundColor: AppColors.danger,
-          ),
-        );
+        _showError('Error inesperado: ${e.toString()}');
       }
+    }
+  }
+
+  void _showError(String msg) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(msg), backgroundColor: AppColors.danger),
+    );
+  }
+
+  String _mapFirestoreError(String code) {
+    switch (code) {
+      case 'unavailable':
+        return 'Servicio temporalmente no disponible. Verifica tu conexión e intenta de nuevo.';
+      case 'permission-denied':
+        return 'Sin permisos para acceder. Contacta al administrador.';
+      case 'not-found':
+        return 'Cuenta no configurada correctamente.';
+      default:
+        return 'Error de base de datos ($code). Intenta de nuevo.';
+    }
+  }
+
+  String _mapAuthError(String code) {
+    switch (code) {
+      case 'user-not-found':
+        return 'No existe una cuenta con ese email.';
+      case 'wrong-password':
+        return 'Contraseña incorrecta.';
+      case 'invalid-credential':
+        return 'Email o contraseña incorrectos.';
+      case 'invalid-email':
+        return 'El formato del email no es válido.';
+      case 'user-disabled':
+        return 'Esta cuenta está deshabilitada.';
+      case 'too-many-requests':
+        return 'Demasiados intentos. Intenta más tarde.';
+      case 'network-request-failed':
+        return 'Sin conexión a internet.';
+      default:
+        return 'Error de autenticación ($code).';
     }
   }
 
@@ -103,6 +133,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       case RolUsuario.administradora:
         return '/dashboard';
       case RolUsuario.enfermera:
+      case RolUsuario.secretaria_recepcion:
+      case RolUsuario.doctora:
         return '/pacientes';
       case RolUsuario.terapeuta:
         return '/agenda-terapeuta';

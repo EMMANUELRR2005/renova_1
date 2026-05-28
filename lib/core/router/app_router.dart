@@ -7,13 +7,17 @@ import '../../features/auth/login_screen.dart';
 import '../../features/auth/providers/auth_provider.dart';
 import '../../features/dashboard/dashboard_screen.dart';
 import '../../features/pacientes/patients_screen.dart';
+import '../../features/pacientes/nuevo_paciente_screen.dart';
+import '../../features/pacientes/detalle_paciente_screen.dart';
+import '../../features/pacientes/editar_paciente_screen.dart';
+import '../../features/pacientes/agregar_comentario_screen.dart';
+import '../../features/pacientes/nueva_consulta_screen.dart';
 import '../../features/citas/appointments_screen.dart';
 import '../../features/expedientes/expediente_screen.dart';
 import '../../features/caja/caja_screen.dart';
 import '../../features/terapeuta/agenda_terapeuta_screen.dart';
 import '../../features/usuarios/usuarios_screen.dart';
 
-// Listener para reactividad de GoRouter
 class GoRouterNotifier extends ChangeNotifier {
   void notifyListenersCustom() {
     notifyListeners();
@@ -46,10 +50,32 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         path: '/dashboard',
         builder: (context, state) => const DashboardScreen(),
       ),
+      // ── Pacientes ─────────────────────────────────────────────────────────
       GoRoute(
         path: '/pacientes',
         builder: (context, state) => const PatientsScreen(),
       ),
+      GoRoute(
+        path: '/pacientes/nuevo',
+        builder: (context, state) => const NuevoPacienteScreen(),
+      ),
+      GoRoute(
+        path: '/pacientes/detalle',
+        builder: (context, state) => const DetallePacienteScreen(),
+      ),
+      GoRoute(
+        path: '/pacientes/editar',
+        builder: (context, state) => const EditarPacienteScreen(),
+      ),
+      GoRoute(
+        path: '/pacientes/comentario',
+        builder: (context, state) => const AgregarComentarioScreen(),
+      ),
+      GoRoute(
+        path: '/pacientes/consulta',
+        builder: (context, state) => const NuevaConsultaScreen(),
+      ),
+      // ── Otras secciones ───────────────────────────────────────────────────
       GoRoute(
         path: '/citas',
         builder: (context, state) => const AppointmentsScreen(),
@@ -74,40 +100,46 @@ final goRouterProvider = Provider<GoRouter>((ref) {
     redirect: (context, state) {
       final path = state.uri.path;
 
-      // Si no está autenticado, ir a login
-      if (!isAuthenticated && path != '/login') {
-        return '/login';
-      }
+      if (!isAuthenticated && path != '/login') return '/login';
+      if (isAuthenticated && path == '/login') return _getRutaInicial(rol);
 
-      // Si está autenticado y va a login, redirigir a ruta inicial según rol
-      if (isAuthenticated && path == '/login') {
-        return _getRutaInicial(rol);
-      }
-
-      // Validar permisos según rol
       if (isAuthenticated && rol != null) {
-        // Solo terapeuta puede acceder a /agenda-terapeuta
         if (path == '/agenda-terapeuta' && rol != RolUsuario.terapeuta) {
           return _getRutaInicial(rol);
         }
-
-        // Solo administradora puede acceder a /caja y /usuarios
-        if ((path == '/caja' || path == '/usuarios') &&
+        if ((path == '/caja' || path == '/usuarios' || path == '/dashboard') &&
             rol != RolUsuario.administradora) {
           return _getRutaInicial(rol);
         }
-
-        // Solo administradora puede acceder a /dashboard
-        if (path == '/dashboard' && rol != RolUsuario.administradora) {
+        if (path == '/expedientes' &&
+            rol != RolUsuario.administradora &&
+            rol != RolUsuario.enfermera) {
           return _getRutaInicial(rol);
         }
-
-        // Administradora y enfermera pueden acceder a /pacientes, /citas, /expedientes
-        if ((path == '/pacientes' ||
-                path == '/citas' ||
-                path == '/expedientes') &&
-            (rol != RolUsuario.administradora &&
-                rol != RolUsuario.enfermera)) {
+        if (path == '/citas' &&
+            rol != RolUsuario.administradora &&
+            rol != RolUsuario.enfermera &&
+            rol != RolUsuario.secretaria_recepcion) {
+          return _getRutaInicial(rol);
+        }
+        // Solo secretaria puede acceder a nuevo/editar
+        if ((path == '/pacientes/nuevo' || path == '/pacientes/editar') &&
+            rol != RolUsuario.secretaria_recepcion) {
+          return '/pacientes';
+        }
+        // Solo secretaria puede agregar comentarios
+        if (path == '/pacientes/comentario' &&
+            rol != RolUsuario.secretaria_recepcion) {
+          return '/pacientes';
+        }
+        // Solo doctora y enfermera pueden agregar consultas
+        if (path == '/pacientes/consulta' &&
+            rol != RolUsuario.doctora &&
+            rol != RolUsuario.enfermera) {
+          return '/pacientes';
+        }
+        // /pacientes y sus sub-rutas: todos excepto terapeuta
+        if (path.startsWith('/pacientes') && rol == RolUsuario.terapeuta) {
           return _getRutaInicial(rol);
         }
       }
@@ -117,12 +149,13 @@ final goRouterProvider = Provider<GoRouter>((ref) {
   );
 });
 
-/// Retorna la ruta inicial según el rol del usuario
 String _getRutaInicial(RolUsuario? rol) {
   switch (rol) {
     case RolUsuario.administradora:
       return '/dashboard';
     case RolUsuario.enfermera:
+    case RolUsuario.secretaria_recepcion:
+    case RolUsuario.doctora:
       return '/pacientes';
     case RolUsuario.terapeuta:
       return '/agenda-terapeuta';

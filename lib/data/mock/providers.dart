@@ -6,6 +6,7 @@ import '../services/paciente_service.dart';
 import '../services/cita_service.dart';
 import '../services/sesion_service.dart';
 import '../services/usuario_service.dart';
+import '../../features/auth/providers/auth_provider.dart';
 
 // ============================================================================
 // SERVICIOS FIREBASE
@@ -91,6 +92,35 @@ final kpiProvider = Provider<Map<String, dynamic>>((ref) {
 });
 
 // ============================================================================
+// STREAMS MODELO NUEVO (Paciente)
+// ============================================================================
+
+/// Filtro de estado para la lista de pacientes nueva
+final filtroPacientesEstadoProvider = StateProvider<String>((ref) => 'todos');
+
+/// ID del paciente seleccionado (para navegar entre pantallas)
+final selectedPacienteIdProvider = StateProvider<String?>((ref) => null);
+
+/// Stream de pacientes con modelo nuevo
+final pacientesV2StreamProvider = StreamProvider<List<Paciente>>((ref) {
+  final filtro = ref.watch(filtroPacientesEstadoProvider);
+  return ref.watch(pacienteServiceProvider).streamPacientes(
+      filtroEstado: filtro == 'todos' ? null : filtro);
+});
+
+/// Stream de historial de un paciente específico
+final historialPacienteProvider =
+    StreamProvider.family<List<HistorialConsulta>, String>((ref, pacienteId) {
+  return ref.watch(pacienteServiceProvider).streamHistorial(pacienteId);
+});
+
+/// Stream de un paciente por ID
+final pacienteByIdProvider =
+    StreamProvider.family<Paciente?, String>((ref, id) {
+  return ref.watch(pacienteServiceProvider).streamPacienteById(id);
+});
+
+// ============================================================================
 // FILTROS Y SELECCIONES
 // ============================================================================
 
@@ -100,8 +130,7 @@ final filtroPacientesProvider = StateProvider<String>((ref) => 'todos');
 /// Paciente seleccionado para ver detalle
 final pacienteSeleccionadoProvider = StateProvider<Patient?>((ref) => null);
 
-/// Usuario activo - importado del auth_provider
-final usuarioActivoProvider = StateProvider<Usuario?>((ref) => null);
+// usuarioActivoProvider se define en features/auth/providers/auth_provider.dart
 
 // ============================================================================
 // PROVIDERS PARA COMPATIBILIDAD (sin usar, pero se mantienen para referencia)

@@ -8,6 +8,8 @@ enum RolUsuario {
   administradora,
   enfermera,
   terapeuta,
+  secretaria_recepcion,
+  doctora,
 }
 
 enum EspecialidadTerapeuta {
@@ -383,6 +385,267 @@ class PlanTratamiento {
       fechaInicio: map['fechaInicio'] ?? '',
       activo: map['activo'] ?? true,
     );
+}
+
+// ============================================================================
+// MODELO PACIENTE (nuevo — para módulo de gestión de pacientes)
+// ============================================================================
+
+class ContactoEmergencia {
+  final String nombre;
+  final String telefono;
+  final String relacion;
+
+  ContactoEmergencia({
+    required this.nombre,
+    required this.telefono,
+    required this.relacion,
+  });
+
+  Map<String, dynamic> toMap() => {
+    'nombre': nombre,
+    'telefono': telefono,
+    'relacion': relacion,
+  };
+
+  factory ContactoEmergencia.fromMap(Map<String, dynamic>? map) =>
+    ContactoEmergencia(
+      nombre: map?['nombre'] ?? '',
+      telefono: map?['telefono'] ?? '',
+      relacion: map?['relacion'] ?? '',
+    );
+}
+
+class Medicamento {
+  final String nombre;
+  final String dosis;
+  final String frecuencia;
+  final String duracion;
+
+  Medicamento({
+    required this.nombre,
+    required this.dosis,
+    required this.frecuencia,
+    required this.duracion,
+  });
+
+  Map<String, dynamic> toMap() => {
+    'nombre': nombre,
+    'dosis': dosis,
+    'frecuencia': frecuencia,
+    'duracion': duracion,
+  };
+
+  factory Medicamento.fromMap(Map<String, dynamic> map) =>
+    Medicamento(
+      nombre: map['nombre'] ?? '',
+      dosis: map['dosis'] ?? '',
+      frecuencia: map['frecuencia'] ?? '',
+      duracion: map['duracion'] ?? '',
+    );
+}
+
+class Paciente {
+  final String id;
+  final String nombre;
+  final String apellido;
+  final String email;
+  final String telefono;
+  final String fechaNacimiento;
+  final int edad;
+  final String genero;
+  final String direccion;
+  final String ciudad;
+  final String numeroIdentificacion;
+  final String tipoIdentificacion;
+  final String alergias;
+  final String condicionesPreexistentes;
+  final ContactoEmergencia contactoEmergencia;
+  final String estado;
+  final DateTime? fechaRegistro;
+  final String registradoPor;
+  final DateTime? ultimaActualizacion;
+  final String? actualizadoPor;
+
+  Paciente({
+    required this.id,
+    required this.nombre,
+    required this.apellido,
+    required this.email,
+    required this.telefono,
+    required this.fechaNacimiento,
+    required this.edad,
+    required this.genero,
+    required this.direccion,
+    required this.ciudad,
+    required this.numeroIdentificacion,
+    required this.tipoIdentificacion,
+    required this.alergias,
+    required this.condicionesPreexistentes,
+    required this.contactoEmergencia,
+    required this.estado,
+    required this.registradoPor,
+    this.fechaRegistro,
+    this.ultimaActualizacion,
+    this.actualizadoPor,
+  });
+
+  String get nombreCompleto => '$nombre $apellido'.trim();
+
+  Map<String, dynamic> toMap() => {
+    'nombre': nombre,
+    'apellido': apellido,
+    'email': email,
+    'telefono': telefono,
+    'fechaNacimiento': fechaNacimiento,
+    'edad': edad,
+    'genero': genero,
+    'direccion': direccion,
+    'ciudad': ciudad,
+    'numeroIdentificacion': numeroIdentificacion,
+    'tipoIdentificacion': tipoIdentificacion,
+    'alergias': alergias,
+    'condicionesPreexistentes': condicionesPreexistentes,
+    'contactoEmergencia': contactoEmergencia.toMap(),
+    'estado': estado,
+    'registradoPor': registradoPor,
+    'fechaRegistro': FieldValue.serverTimestamp(),
+  };
+
+  Map<String, dynamic> toUpdateMap(String actualizadoPorUid) => {
+    'nombre': nombre,
+    'apellido': apellido,
+    'email': email,
+    'telefono': telefono,
+    'fechaNacimiento': fechaNacimiento,
+    'edad': edad,
+    'genero': genero,
+    'direccion': direccion,
+    'ciudad': ciudad,
+    'tipoIdentificacion': tipoIdentificacion,
+    'alergias': alergias,
+    'condicionesPreexistentes': condicionesPreexistentes,
+    'contactoEmergencia': contactoEmergencia.toMap(),
+    'estado': estado,
+    'ultimaActualizacion': FieldValue.serverTimestamp(),
+    'actualizadoPor': actualizadoPorUid,
+  };
+
+  factory Paciente.fromMap(Map<String, dynamic> map, String docId) {
+    DateTime? parseFecha(dynamic v) {
+      if (v == null) return null;
+      if (v is Timestamp) return v.toDate();
+      return null;
+    }
+    return Paciente(
+      id: docId,
+      nombre: map['nombre'] ?? '',
+      apellido: map['apellido'] ?? '',
+      email: map['email'] ?? '',
+      telefono: map['telefono'] ?? '',
+      fechaNacimiento: map['fechaNacimiento'] ?? '',
+      edad: map['edad'] ?? 0,
+      genero: map['genero'] ?? '',
+      direccion: map['direccion'] ?? '',
+      ciudad: map['ciudad'] ?? '',
+      numeroIdentificacion: map['numeroIdentificacion'] ?? map['dpi'] ?? '',
+      tipoIdentificacion: map['tipoIdentificacion'] ?? 'cédula',
+      alergias: map['alergias'] is String
+          ? map['alergias']
+          : (map['alergias'] as List?)?.join(', ') ?? '',
+      condicionesPreexistentes: map['condicionesPreexistentes'] is String
+          ? map['condicionesPreexistentes']
+          : (map['condicionesBase'] as List?)?.join(', ') ?? '',
+      contactoEmergencia: ContactoEmergencia.fromMap(
+          map['contactoEmergencia'] as Map<String, dynamic>?),
+      estado: map['estado'] ?? 'activo',
+      fechaRegistro: parseFecha(map['fechaRegistro'] ?? map['creadoEn']),
+      registradoPor: map['registradoPor'] ?? '',
+      ultimaActualizacion: parseFecha(map['ultimaActualizacion']),
+      actualizadoPor: map['actualizadoPor'],
+    );
+  }
+}
+
+class HistorialConsulta {
+  final String id;
+  final String tipo;
+  final DateTime? fecha;
+  final String motivo;
+  final String diagnostico;
+  final String tratamiento;
+  final List<Medicamento> medicamentos;
+  final String comentarios;
+  final String doctora;
+  final String doctoraUid;
+  final String enfermera;
+  final String enfermeraUid;
+  final String creadoPor;
+  final String rolCreador;
+  final String? proximaCita;
+
+  HistorialConsulta({
+    required this.id,
+    required this.tipo,
+    required this.creadoPor,
+    required this.rolCreador,
+    this.fecha,
+    this.motivo = '',
+    this.diagnostico = '',
+    this.tratamiento = '',
+    this.medicamentos = const [],
+    this.comentarios = '',
+    this.doctora = '',
+    this.doctoraUid = '',
+    this.enfermera = '',
+    this.enfermeraUid = '',
+    this.proximaCita,
+  });
+
+  Map<String, dynamic> toMap() => {
+    'tipo': tipo,
+    'fecha': FieldValue.serverTimestamp(),
+    'motivo': motivo,
+    'diagnostico': diagnostico,
+    'tratamiento': tratamiento,
+    'medicamentos': medicamentos.map((m) => m.toMap()).toList(),
+    'comentarios': comentarios,
+    'doctora': doctora,
+    'doctora_uid': doctoraUid,
+    'enfermera': enfermera,
+    'enfermera_uid': enfermeraUid,
+    'creadoPor': creadoPor,
+    'rol_creador': rolCreador,
+    'proxima_cita': proximaCita,
+  };
+
+  factory HistorialConsulta.fromMap(Map<String, dynamic> map, String docId) {
+    DateTime? parseFecha(dynamic v) {
+      if (v == null) return null;
+      if (v is Timestamp) return v.toDate();
+      return null;
+    }
+    return HistorialConsulta(
+      id: docId,
+      tipo: map['tipo'] ?? 'comentario',
+      fecha: parseFecha(map['fecha']),
+      motivo: map['motivo'] ?? '',
+      diagnostico: map['diagnostico'] ?? '',
+      tratamiento: map['tratamiento'] ?? '',
+      medicamentos: (map['medicamentos'] as List?)
+              ?.map((m) => Medicamento.fromMap(m as Map<String, dynamic>))
+              .toList() ??
+          [],
+      comentarios: map['comentarios'] ?? '',
+      doctora: map['doctora'] ?? '',
+      doctoraUid: map['doctora_uid'] ?? '',
+      enfermera: map['enfermera'] ?? '',
+      enfermeraUid: map['enfermera_uid'] ?? '',
+      creadoPor: map['creadoPor'] ?? '',
+      rolCreador: map['rol_creador'] ?? '',
+      proximaCita: map['proxima_cita'],
+    );
+  }
 }
 
 // ============================================================================

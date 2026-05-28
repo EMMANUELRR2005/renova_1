@@ -15,19 +15,18 @@ final authRolProvider = Provider<RolUsuario?>((ref) {
   return ref.watch(usuarioActivoProvider)?.rol;
 });
 
-// Provider de login con Firebase Auth
+// Provider de login con Firebase Auth.
+// NO captura excepciones: las deja propagar para que el UI muestre
+// el error correcto (FirebaseAuthException.code, red, etc.)
 final loginProvider = FutureProvider.autoDispose
     .family<bool, (String, String)>((ref, args) async {
   final (email, password) = args;
-  try {
-    final authService = ref.read(authServiceProvider);
-    final usuario = await authService.login(email, password);
-    if (usuario == null || !usuario.activo) return false;
-    ref.read(usuarioActivoProvider.notifier).state = usuario;
-    return true;
-  } catch (e) {
-    return false;
-  }
+  final authService = ref.read(authServiceProvider);
+  final usuario = await authService.login(email, password);
+  // null → doc no existe en Firestore; activo=false → desactivado
+  if (usuario == null || !usuario.activo) return false;
+  ref.read(usuarioActivoProvider.notifier).state = usuario;
+  return true;
 });
 
 // Provider de logout con Firebase Auth
