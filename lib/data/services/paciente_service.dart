@@ -25,15 +25,20 @@ class PacienteService {
   }
 
   // ─── Modelo nuevo (Paciente) ──────────────────────────────────────────────
+  // Ordenamos en Dart para evitar índices compuestos
 
   Stream<List<Paciente>> streamPacientes({String? filtroEstado}) {
-    Query<Map<String, dynamic>> query =
-        _db.collection('pacientes').orderBy('apellido');
+    Query<Map<String, dynamic>> query = _db.collection('pacientes');
     if (filtroEstado != null && filtroEstado != 'todos') {
       query = query.where('estado', isEqualTo: filtroEstado);
     }
-    return query.snapshots().map((snap) =>
-        snap.docs.map((d) => Paciente.fromMap(d.data(), d.id)).toList());
+    return query.snapshots().map((snap) {
+      final list = snap.docs
+          .map((d) => Paciente.fromMap(d.data(), d.id))
+          .toList();
+      list.sort((a, b) => a.apellido.compareTo(b.apellido));
+      return list;
+    });
   }
 
   Future<String> crearPaciente(Paciente paciente) async {
@@ -101,5 +106,68 @@ class PacienteService {
   Future<void> modificarPaciente(
       String id, Map<String, dynamic> datos) async {
     await _db.collection('pacientes').doc(id).update(datos);
+  }
+
+  // ─── Cambio de estado (Enfermera) ─────────────────────────────────────────
+
+  Future<void> inactivarPaciente({
+    required String pacienteId,
+    required String servicioRealizado,
+    required String servicioRealizadoId,
+    required String enfermeraUid,
+    required String nombreEnfermera,
+  }) async {
+    await _db.collection('pacientes').doc(pacienteId).update({
+      'estado': 'inactivo',
+      'servicioRealizado': servicioRealizado,
+      'servicioRealizadoId': servicioRealizadoId,
+      'fechaInactivacion': FieldValue.serverTimestamp(),
+      'inactivadoPor': enfermeraUid,
+      'nombreInactivador': nombreEnfermera,
+    });
+  }
+
+  Future<void> reactivarPaciente({
+    required String pacienteId,
+    required String enfermeraUid,
+  }) async {
+    await _db.collection('pacientes').doc(pacienteId).update({
+      'estado': 'activo',
+      'fechaReactivacion': FieldValue.serverTimestamp(),
+      'reactivadoPor': enfermeraUid,
+      'servicioRealizado': FieldValue.delete(),
+      'servicioRealizadoId': FieldValue.delete(),
+    });
+  }
+
+  // ─── Pacientes activos (para citas) ───────────────────────────────────────
+  // Ordenamos en Dart para evitar índices compuestos
+
+  Stream<List<Paciente>> streamPacientesActivos() {
+    return _db
+        .collection('pacientes')
+        .where('estado', isEqualTo: 'activo')
+        .snapshots()
+        .map((snap) {
+          final list = snap.docs
+              .map((d) => Paciente.fromMap(d.data(), d.id))
+              .toList();
+          list.sort((a, b) => a.apellido.compareTo(b.apellido));
+          return list;
+        });
+  }
+
+  Future<List<Paciente>> buscarPacientesActivos(String query) async {
+    final snap = await _db
+        .collection('pacientes')
+        .where('estado', isEqualTo: 'activo')
+        .get();
+    final queryLower = query.toLowerCase();
+    return snap.docs
+        .map((d) => Paciente.fromMap(d.data(), d.id))
+        .where((p) =>
+            p.nombreCompleto.toLowerCase().contains(queryLower) ||
+            p.numeroIdentificacion.contains(query))
+        .toList();
   }
 }

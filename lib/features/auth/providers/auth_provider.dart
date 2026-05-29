@@ -30,11 +30,22 @@ final loginProvider = FutureProvider.autoDispose
 });
 
 // Provider de logout con Firebase Auth
+// IMPORTANTE: Invalida todos los providers para evitar listeners zombie
 final logoutProvider = Provider<Future<void> Function()>((ref) {
   return () async {
     final authService = AuthService();
-    await authService.logout();
+
+    // 1. Limpiar el usuario activo ANTES de signOut
+    //    Esto hace que los StreamProviders que dependen de usuarioActivoProvider
+    //    dejen de escuchar Firestore inmediatamente.
     ref.read(usuarioActivoProvider.notifier).state = null;
+
+    // 2. Invalidar providers que tienen streams activos de Firestore
+    //    Esto fuerza la cancelación de las suscripciones.
+    ref.invalidate(usuarioActivoProvider);
+
+    // 3. Cerrar sesión en Firebase Auth
+    await authService.logout();
   };
 });
 

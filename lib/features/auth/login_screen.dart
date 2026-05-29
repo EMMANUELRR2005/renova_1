@@ -333,8 +333,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       ),
                       const SizedBox(height: 12),
                       _buildCredentialDemo('Admin', 'admin@renova.gt', 'renova2024'),
+                      _buildCredentialDemo('Secretaria', 'marcos@renova.gt', 'renova2024'),
                       _buildCredentialDemo('Enfermera', 'carmen@renova.gt', 'renova2024'),
-                      _buildCredentialDemo('Terapeuta', 'luis@renova.gt', 'renova2024'),
+                      _buildCredentialDemo('Doctora', 'maria@renova.gt', 'renova2024'),
                       const SizedBox(height: 16),
                       Center(
                         child: Text(

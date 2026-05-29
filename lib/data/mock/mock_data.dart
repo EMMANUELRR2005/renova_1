@@ -42,11 +42,71 @@ enum EstadoCita {
   en_curso,
   completada,
   cancelada,
+  pendiente,
+}
+
+// ============================================================================
+// MODELOS - SERVICIOS Y CLÍNICAS
+// ============================================================================
+
+class ServicioClinica {
+  final String id;
+  final String nombre;
+  final String? descripcion;
+  final bool activo;
+
+  ServicioClinica({
+    required this.id,
+    required this.nombre,
+    this.descripcion,
+    this.activo = true,
+  });
+
+  Map<String, dynamic> toMap() => {
+    'nombre': nombre,
+    'descripcion': descripcion ?? '',
+    'activo': activo,
+  };
+
+  factory ServicioClinica.fromMap(Map<String, dynamic> map, String docId) =>
+    ServicioClinica(
+      id: docId,
+      nombre: map['nombre'] ?? '',
+      descripcion: map['descripcion'],
+      activo: map['activo'] ?? true,
+    );
+}
+
+class Clinica {
+  final String id;
+  final String nombre;
+  final String? direccion;
+  final bool activo;
+
+  Clinica({
+    required this.id,
+    required this.nombre,
+    this.direccion,
+    this.activo = true,
+  });
+
+  Map<String, dynamic> toMap() => {
+    'nombre': nombre,
+    'direccion': direccion ?? '',
+    'activo': activo,
+  };
+
+  factory Clinica.fromMap(Map<String, dynamic> map, String docId) =>
+    Clinica(
+      id: docId,
+      nombre: map['nombre'] ?? '',
+      direccion: map['direccion'],
+      activo: map['activo'] ?? true,
+    );
 }
 
 // ============================================================================
 // MODELOS
-// ============================================================================
 
 class Usuario {
   final String id;
@@ -285,6 +345,93 @@ class Appointment {
     );
 }
 
+// ── Cita Médica (para secretaria) ───────────────────────────────────────────
+
+class CitaMedica {
+  final String id;
+  final String pacienteId;
+  final String nombrePaciente;
+  final String servicio;
+  final String servicioId;
+  final String clinica;
+  final String clinicaId;
+  final String? doctora;
+  final String? doctoraId;
+  final DateTime fecha;
+  final String hora;
+  final String motivo;
+  final String? notas;
+  final String estado; // pendiente, confirmada, cancelada, completada
+  final String creadaPor;
+  final DateTime? fechaCreacion;
+  final String? motivoCancelacion;
+
+  CitaMedica({
+    required this.id,
+    required this.pacienteId,
+    required this.nombrePaciente,
+    required this.servicio,
+    required this.servicioId,
+    required this.clinica,
+    required this.clinicaId,
+    required this.fecha,
+    required this.hora,
+    required this.motivo,
+    required this.estado,
+    required this.creadaPor,
+    this.doctora,
+    this.doctoraId,
+    this.notas,
+    this.fechaCreacion,
+    this.motivoCancelacion,
+  });
+
+  Map<String, dynamic> toMap() => {
+    'pacienteId': pacienteId,
+    'nombrePaciente': nombrePaciente,
+    'servicio': servicio,
+    'servicioId': servicioId,
+    'clinica': clinica,
+    'clinicaId': clinicaId,
+    'doctora': doctora ?? '',
+    'doctoraId': doctoraId ?? '',
+    'fecha': Timestamp.fromDate(fecha),
+    'hora': hora,
+    'motivo': motivo,
+    'notas': notas ?? '',
+    'estado': estado,
+    'creadaPor': creadaPor,
+    'fechaCreacion': FieldValue.serverTimestamp(),
+  };
+
+  factory CitaMedica.fromMap(Map<String, dynamic> map, String docId) {
+    DateTime? parseFecha(dynamic v) {
+      if (v == null) return null;
+      if (v is Timestamp) return v.toDate();
+      return null;
+    }
+    return CitaMedica(
+      id: docId,
+      pacienteId: map['pacienteId'] ?? '',
+      nombrePaciente: map['nombrePaciente'] ?? '',
+      servicio: map['servicio'] ?? '',
+      servicioId: map['servicioId'] ?? '',
+      clinica: map['clinica'] ?? '',
+      clinicaId: map['clinicaId'] ?? '',
+      doctora: map['doctora'],
+      doctoraId: map['doctoraId'],
+      fecha: parseFecha(map['fecha']) ?? DateTime.now(),
+      hora: map['hora'] ?? '',
+      motivo: map['motivo'] ?? '',
+      notas: map['notas'],
+      estado: map['estado'] ?? 'pendiente',
+      creadaPor: map['creadaPor'] ?? '',
+      fechaCreacion: parseFecha(map['fechaCreacion']),
+      motivoCancelacion: map['motivoCancelacion'],
+    );
+  }
+}
+
 class SesionTerapia {
   final String id;
   final String citaId;
@@ -466,6 +613,19 @@ class Paciente {
   final String registradoPor;
   final DateTime? ultimaActualizacion;
   final String? actualizadoPor;
+  // Nuevos campos: Servicio y Clínica
+  final String? servicio;
+  final String? servicioId;
+  final String? clinica;
+  final String? clinicaId;
+  // Campos de inactivación (enfermera)
+  final String? servicioRealizado;
+  final String? servicioRealizadoId;
+  final DateTime? fechaInactivacion;
+  final String? inactivadoPor;
+  final String? nombreInactivador;
+  final DateTime? fechaReactivacion;
+  final String? reactivadoPor;
 
   Paciente({
     required this.id,
@@ -488,6 +648,17 @@ class Paciente {
     this.fechaRegistro,
     this.ultimaActualizacion,
     this.actualizadoPor,
+    this.servicio,
+    this.servicioId,
+    this.clinica,
+    this.clinicaId,
+    this.servicioRealizado,
+    this.servicioRealizadoId,
+    this.fechaInactivacion,
+    this.inactivadoPor,
+    this.nombreInactivador,
+    this.fechaReactivacion,
+    this.reactivadoPor,
   });
 
   String get nombreCompleto => '$nombre $apellido'.trim();
@@ -510,6 +681,10 @@ class Paciente {
     'estado': estado,
     'registradoPor': registradoPor,
     'fechaRegistro': FieldValue.serverTimestamp(),
+    'servicio': servicio ?? '',
+    'servicioId': servicioId ?? '',
+    'clinica': clinica ?? '',
+    'clinicaId': clinicaId ?? '',
   };
 
   Map<String, dynamic> toUpdateMap(String actualizadoPorUid) => {
@@ -529,6 +704,10 @@ class Paciente {
     'estado': estado,
     'ultimaActualizacion': FieldValue.serverTimestamp(),
     'actualizadoPor': actualizadoPorUid,
+    'servicio': servicio ?? '',
+    'servicioId': servicioId ?? '',
+    'clinica': clinica ?? '',
+    'clinicaId': clinicaId ?? '',
   };
 
   factory Paciente.fromMap(Map<String, dynamic> map, String docId) {
@@ -563,6 +742,17 @@ class Paciente {
       registradoPor: map['registradoPor'] ?? '',
       ultimaActualizacion: parseFecha(map['ultimaActualizacion']),
       actualizadoPor: map['actualizadoPor'],
+      servicio: map['servicio'],
+      servicioId: map['servicioId'],
+      clinica: map['clinica'],
+      clinicaId: map['clinicaId'],
+      servicioRealizado: map['servicioRealizado'],
+      servicioRealizadoId: map['servicioRealizadoId'],
+      fechaInactivacion: parseFecha(map['fechaInactivacion']),
+      inactivadoPor: map['inactivadoPor'],
+      nombreInactivador: map['nombreInactivador'],
+      fechaReactivacion: parseFecha(map['fechaReactivacion']),
+      reactivadoPor: map['reactivadoPor'],
     );
   }
 }

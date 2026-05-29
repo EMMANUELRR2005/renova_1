@@ -37,6 +37,8 @@ class SeedService {
       print('🔵 [Seed] Escribiendo datos iniciales...');
       await _escribirDocAdmin(adminUid);
       await _seedUsuarios();
+      await _seedServicios();
+      await _seedClinicas();
       await _seedSalas();
       await _seedTerapeutas();
       await _seedPacientes();
@@ -105,6 +107,8 @@ class SeedService {
       ('Enf. Rosa Ajú', 'rosa@renova.gt', 'renova2024', RolUsuario.enfermera),
       ('Terapeuta Luis Choc', 'luis@renova.gt', 'renova2024', RolUsuario.terapeuta),
       ('Terapeuta Ana Pac', 'ana@renova.gt', 'renova2024', RolUsuario.terapeuta),
+      ('Dra. María García', 'maria@renova.gt', 'renova2024', RolUsuario.doctora),
+      ('Sec. Marcos López', 'marcos@renova.gt', 'renova2024', RolUsuario.secretaria_recepcion),
     ];
 
     for (final (nombre, email, password, rol) in usuarios) {
@@ -121,6 +125,46 @@ class SeedService {
       } catch (e) {
         print('  ⚠ Error creando usuario $email: $e');
       }
+    }
+  }
+
+  Future<void> _seedServicios() async {
+    print('Sembrando servicios...');
+    final servicios = [
+      ('Clínica General', 'Consultas médicas generales'),
+      ('Pediatría', 'Atención especializada para niños'),
+      ('Ginecología', 'Salud femenina y obstetricia'),
+      ('Odontología', 'Salud dental y bucal'),
+      ('Nutrición', 'Planes alimenticios y control de peso'),
+      ('Dermatología', 'Cuidado de la piel'),
+      ('Estética', 'Tratamientos estéticos y belleza'),
+    ];
+
+    for (final (nombre, descripcion) in servicios) {
+      await _db.collection('servicios').add({
+        'nombre': nombre,
+        'descripcion': descripcion,
+        'activo': true,
+      });
+      print('  ✓ Servicio creado: $nombre');
+    }
+  }
+
+  Future<void> _seedClinicas() async {
+    print('Sembrando clínicas...');
+    final clinicas = [
+      ('Clínica Renova Central', 'Av. Principal 123, Zona 1'),
+      ('Clínica Renova Norte', 'Blvd. del Norte 456, Zona 17'),
+      ('Clínica Renova Sur', 'Calzada Sur 789, Zona 12'),
+    ];
+
+    for (final (nombre, direccion) in clinicas) {
+      await _db.collection('clinicas').add({
+        'nombre': nombre,
+        'direccion': direccion,
+        'activo': true,
+      });
+      print('  ✓ Clínica creada: $nombre');
     }
   }
 

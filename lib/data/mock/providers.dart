@@ -6,6 +6,7 @@ import '../services/paciente_service.dart';
 import '../services/cita_service.dart';
 import '../services/sesion_service.dart';
 import '../services/usuario_service.dart';
+import '../services/catalogo_service.dart';
 import '../../features/auth/providers/auth_provider.dart';
 
 // ============================================================================
@@ -17,18 +18,26 @@ final pacienteServiceProvider = Provider((ref) => PacienteService());
 final citaServiceProvider = Provider((ref) => CitaService());
 final sesionServiceProvider = Provider((ref) => SesionService());
 final usuarioServiceProvider = Provider((ref) => UsuarioService());
+final catalogoServiceProvider = Provider((ref) => CatalogoService());
 
 // ============================================================================
 // STREAMS EN TIEMPO REAL
 // ============================================================================
 
 /// Stream de pacientes en tiempo real
+/// Se invalida automáticamente cuando el usuario cambia (logout/login)
 final pacientesStreamProvider = StreamProvider<List<Patient>>((ref) {
+  // Depender del usuario activo para que el stream se reinicie al cambiar sesión
+  final usuario = ref.watch(usuarioActivoProvider);
+  if (usuario == null) return const Stream.empty();
   return ref.watch(pacienteServiceProvider).getPacientes();
 });
 
 /// Stream de citas de hoy
+/// Se invalida automáticamente cuando el usuario cambia (logout/login)
 final citasHoyStreamProvider = StreamProvider<List<Appointment>>((ref) {
+  final usuario = ref.watch(usuarioActivoProvider);
+  if (usuario == null) return const Stream.empty();
   return ref.watch(citaServiceProvider).getCitasHoy();
 });
 
@@ -40,12 +49,18 @@ final citasTerapeutaProvider = StreamProvider<List<Appointment>>((ref) {
 });
 
 /// Stream de usuarios (para pantalla de usuarios)
+/// Se invalida automáticamente cuando el usuario cambia (logout/login)
 final usuariosStreamProvider = StreamProvider<List<Usuario>>((ref) {
+  final usuario = ref.watch(usuarioActivoProvider);
+  if (usuario == null) return const Stream.empty();
   return ref.watch(usuarioServiceProvider).getUsuarios();
 });
 
 /// Stream de sesiones activas
+/// Se invalida automáticamente cuando el usuario cambia (logout/login)
 final sesionesActivasStreamProvider = StreamProvider<List<SesionTerapia>>((ref) {
+  final usuario = ref.watch(usuarioActivoProvider);
+  if (usuario == null) return const Stream.empty();
   return ref.watch(sesionServiceProvider).getSesionesActivas();
 });
 
@@ -102,21 +117,32 @@ final filtroPacientesEstadoProvider = StateProvider<String>((ref) => 'todos');
 final selectedPacienteIdProvider = StateProvider<String?>((ref) => null);
 
 /// Stream de pacientes con modelo nuevo
+/// Se invalida automáticamente cuando el usuario cambia (logout/login)
 final pacientesV2StreamProvider = StreamProvider<List<Paciente>>((ref) {
+  // Depender del usuario activo para que el stream se reinicie al cambiar sesión
+  final usuario = ref.watch(usuarioActivoProvider);
+  if (usuario == null) return const Stream.empty();
+
   final filtro = ref.watch(filtroPacientesEstadoProvider);
   return ref.watch(pacienteServiceProvider).streamPacientes(
       filtroEstado: filtro == 'todos' ? null : filtro);
 });
 
 /// Stream de historial de un paciente específico
+/// Se invalida automáticamente cuando el usuario cambia (logout/login)
 final historialPacienteProvider =
     StreamProvider.family<List<HistorialConsulta>, String>((ref, pacienteId) {
+  final usuario = ref.watch(usuarioActivoProvider);
+  if (usuario == null) return const Stream.empty();
   return ref.watch(pacienteServiceProvider).streamHistorial(pacienteId);
 });
 
 /// Stream de un paciente por ID
+/// Se invalida automáticamente cuando el usuario cambia (logout/login)
 final pacienteByIdProvider =
     StreamProvider.family<Paciente?, String>((ref, id) {
+  final usuario = ref.watch(usuarioActivoProvider);
+  if (usuario == null) return const Stream.empty();
   return ref.watch(pacienteServiceProvider).streamPacienteById(id);
 });
 
@@ -165,7 +191,11 @@ final planesProvider = Provider<List<PlanTratamiento>>((ref) {
 });
 
 /// Stream de planes activos
+/// Se invalida automáticamente cuando el usuario cambia (logout/login)
 final planesActivosStreamProvider = StreamProvider<List<PlanTratamiento>>((ref) {
+  final usuario = ref.watch(usuarioActivoProvider);
+  if (usuario == null) return const Stream.empty();
+
   return FirebaseFirestore.instance
       .collection('planes')
       .where('activo', isEqualTo: true)
@@ -173,5 +203,63 @@ final planesActivosStreamProvider = StreamProvider<List<PlanTratamiento>>((ref) 
       .map((snap) => snap.docs
           .map((d) => PlanTratamiento.fromMap(d.data(), d.id))
           .toList());
+});
+
+// ============================================================================
+// CATÁLOGOS: SERVICIOS Y CLÍNICAS
+// ============================================================================
+
+final serviciosStreamProvider = StreamProvider<List<ServicioClinica>>((ref) {
+  final usuario = ref.watch(usuarioActivoProvider);
+  if (usuario == null) return const Stream.empty();
+  return ref.watch(catalogoServiceProvider).streamServicios();
+});
+
+final clinicasStreamProvider = StreamProvider<List<Clinica>>((ref) {
+  final usuario = ref.watch(usuarioActivoProvider);
+  if (usuario == null) return const Stream.empty();
+  return ref.watch(catalogoServiceProvider).streamClinicas();
+});
+
+final doctorasStreamProvider = StreamProvider<List<Usuario>>((ref) {
+  final usuario = ref.watch(usuarioActivoProvider);
+  if (usuario == null) return const Stream.empty();
+  return ref.watch(catalogoServiceProvider).streamDoctoras();
+});
+
+final pacientesActivosStreamProvider = StreamProvider<List<Paciente>>((ref) {
+  final usuario = ref.watch(usuarioActivoProvider);
+  if (usuario == null) return const Stream.empty();
+  return ref.watch(pacienteServiceProvider).streamPacientesActivos();
+});
+
+// ============================================================================
+// CITAS MÉDICAS (SECRETARIA)
+// ============================================================================
+
+final filtroCitasProvider = StateProvider<String>((ref) => 'hoy');
+
+final citasMedicasStreamProvider = StreamProvider<List<CitaMedica>>((ref) {
+  final usuario = ref.watch(usuarioActivoProvider);
+  if (usuario == null) return const Stream.empty();
+
+  final filtro = ref.watch(filtroCitasProvider);
+  final citaService = ref.watch(citaServiceProvider);
+
+  switch (filtro) {
+    case 'hoy':
+      return citaService.streamCitasMedicasHoy();
+    case 'semana':
+      return citaService.streamCitasMedicasSemana();
+    case 'todas':
+    default:
+      return citaService.streamCitasMedicas();
+  }
+});
+
+final citasDoctoraStreamProvider = StreamProvider<List<CitaMedica>>((ref) {
+  final usuario = ref.watch(usuarioActivoProvider);
+  if (usuario == null) return const Stream.empty();
+  return ref.watch(citaServiceProvider).streamCitasDoctora(usuario.id);
 });
 

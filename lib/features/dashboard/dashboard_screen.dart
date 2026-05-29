@@ -373,6 +373,8 @@ StatusType _estadoToCita(EstadoCita estado) {
       return StatusType.inConsultation;
     case EstadoCita.agendada:
       return StatusType.waiting;
+    case EstadoCita.pendiente:
+      return StatusType.waiting;
     case EstadoCita.en_curso:
       return StatusType.inConsultation;
     case EstadoCita.completada:

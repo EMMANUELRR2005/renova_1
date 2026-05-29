@@ -3,9 +3,9 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Regla principal: cualquier usuario autenticado puede leer y escribir.
-    // NO usar get() ni exists() dentro de las reglas — causan timeouts en escrituras.
+    // Regla simplificada: cualquier usuario autenticado puede leer y escribir.
     // Las restricciones por rol se aplican en la lógica de la app (Flutter + Permisos).
+    // Esto evita timeouts causados por get() en las Rules.
     match /{document=**} {
       allow read, write: if request.auth != null;
     }

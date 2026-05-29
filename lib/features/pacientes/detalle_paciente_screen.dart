@@ -79,6 +79,20 @@ class DetallePacienteScreen extends ConsumerWidget {
                     ),
                     _EstadoBadge(estado: paciente.estado),
                     const SizedBox(width: 12),
+                    if (Permisos.puedeCambiarEstadoPaciente(rol))
+                      OutlinedButton(
+                        onPressed: () => _mostrarDialogCambioEstado(
+                            context, ref, paciente, usuario!),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: paciente.estado == 'activo'
+                              ? AppColors.danger
+                              : AppColors.success,
+                        ),
+                        child: Text(paciente.estado == 'activo'
+                            ? 'Inactivar'
+                            : 'Reactivar'),
+                      ),
+                    const SizedBox(width: 12),
                     if (Permisos.puedeEditarPacientes(rol))
                       ElevatedButton(
                         onPressed: () => context.go('/pacientes/editar'),
@@ -156,6 +170,34 @@ class DetallePacienteScreen extends ConsumerWidget {
                                       : paciente.contactoEmergencia.relacion),
                             ],
                           ),
+                          const SizedBox(height: 12),
+                          _InfoCard(
+                            title: 'Servicio y Clínica',
+                            rows: [
+                              _InfoRow('Servicio',
+                                  paciente.servicio ?? '—'),
+                              _InfoRow('Clínica',
+                                  paciente.clinica ?? '—'),
+                            ],
+                          ),
+                          if (paciente.estado == 'inactivo' &&
+                              paciente.servicioRealizado != null) ...[
+                            const SizedBox(height: 12),
+                            _InfoCard(
+                              title: 'Información de Inactivación',
+                              rows: [
+                                _InfoRow('Servicio Realizado',
+                                    paciente.servicioRealizado ?? '—'),
+                                _InfoRow('Inactivado por',
+                                    paciente.nombreInactivador ?? '—'),
+                                _InfoRow(
+                                    'Fecha',
+                                    paciente.fechaInactivacion != null
+                                        ? '${paciente.fechaInactivacion!.day}/${paciente.fechaInactivacion!.month}/${paciente.fechaInactivacion!.year}'
+                                        : '—'),
+                              ],
+                            ),
+                          ],
                         ],
                       ),
                     ),
@@ -501,4 +543,197 @@ class _DetailRow extends StatelessWidget {
       ),
     );
   }
+}
+
+// ── Dialog para cambio de estado (Enfermera) ────────────────────────────────
+
+void _mostrarDialogCambioEstado(
+  BuildContext context,
+  WidgetRef ref,
+  Paciente paciente,
+  Usuario usuario,
+) {
+  if (paciente.estado == 'activo') {
+    _mostrarDialogInactivar(context, ref, paciente, usuario);
+  } else {
+    _mostrarDialogReactivar(context, ref, paciente, usuario);
+  }
+}
+
+void _mostrarDialogInactivar(
+  BuildContext context,
+  WidgetRef ref,
+  Paciente paciente,
+  Usuario usuario,
+) {
+  String? servicioId;
+  String? servicioNombre;
+
+  showDialog(
+    context: context,
+    builder: (ctx) {
+      return StatefulBuilder(
+        builder: (context, setDialogState) {
+          final serviciosAsync = ref.watch(serviciosStreamProvider);
+
+          return AlertDialog(
+            title: const Text('Inactivar Paciente'),
+            content: SizedBox(
+              width: 400,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '¿Confirmar cambio a Inactivo para ${paciente.nombreCompleto}?',
+                    style: const TextStyle(fontSize: 14),
+                  ),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'Servicio realizado *',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  serviciosAsync.when(
+                    loading: () =>
+                        const Center(child: CircularProgressIndicator()),
+                    error: (e, _) => Text('Error: $e'),
+                    data: (servicios) {
+                      return DropdownButtonFormField<String>(
+                        value: servicioId,
+                        decoration: const InputDecoration(
+                          hintText: 'Selecciona el servicio realizado',
+                          border: OutlineInputBorder(),
+                        ),
+                        items: servicios
+                            .map((s) => DropdownMenuItem(
+                                  value: s.id,
+                                  child: Text(s.nombre),
+                                ))
+                            .toList(),
+                        onChanged: (v) {
+                          final servicio =
+                              servicios.firstWhere((s) => s.id == v);
+                          setDialogState(() {
+                            servicioId = v;
+                            servicioNombre = servicio.nombre;
+                          });
+                        },
+                      );
+                    },
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(),
+                child: const Text('Cancelar'),
+              ),
+              ElevatedButton(
+                onPressed: servicioId == null
+                    ? null
+                    : () async {
+                        try {
+                          await ref
+                              .read(pacienteServiceProvider)
+                              .inactivarPaciente(
+                                pacienteId: paciente.id,
+                                servicioRealizado: servicioNombre!,
+                                servicioRealizadoId: servicioId!,
+                                enfermeraUid: usuario.id,
+                                nombreEnfermera: usuario.nombre,
+                              );
+                          if (ctx.mounted) {
+                            Navigator.of(ctx).pop();
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Paciente inactivado'),
+                                backgroundColor: AppColors.success,
+                              ),
+                            );
+                          }
+                        } catch (e) {
+                          if (ctx.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('Error: $e'),
+                                backgroundColor: AppColors.danger,
+                              ),
+                            );
+                          }
+                        }
+                      },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.danger,
+                ),
+                child: const Text('Confirmar Inactivación'),
+              ),
+            ],
+          );
+        },
+      );
+    },
+  );
+}
+
+void _mostrarDialogReactivar(
+  BuildContext context,
+  WidgetRef ref,
+  Paciente paciente,
+  Usuario usuario,
+) {
+  showDialog(
+    context: context,
+    builder: (ctx) {
+      return AlertDialog(
+        title: const Text('Reactivar Paciente'),
+        content: Text(
+          '¿Confirmar reactivación de ${paciente.nombreCompleto}?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Cancelar'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              try {
+                await ref.read(pacienteServiceProvider).reactivarPaciente(
+                      pacienteId: paciente.id,
+                      enfermeraUid: usuario.id,
+                    );
+                if (ctx.mounted) {
+                  Navigator.of(ctx).pop();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Paciente reactivado'),
+                      backgroundColor: AppColors.success,
+                    ),
+                  );
+                }
+              } catch (e) {
+                if (ctx.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Error: $e'),
+                      backgroundColor: AppColors.danger,
+                    ),
+                  );
+                }
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.success,
+            ),
+            child: const Text('Confirmar Reactivación'),
+          ),
+        ],
+      );
+    },
+  );
 }

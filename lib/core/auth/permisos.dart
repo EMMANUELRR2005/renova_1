@@ -61,4 +61,21 @@ class Permisos {
       rol == RolUsuario.administradora ||
       rol == RolUsuario.enfermera ||
       rol == RolUsuario.secretaria_recepcion;
+
+  // Cambiar estado del paciente: SOLO enfermera
+  static bool puedeCambiarEstadoPaciente(RolUsuario? rol) =>
+      rol == RolUsuario.enfermera;
+
+  // Gestionar citas: secretaria y administradora
+  static bool puedeGestionarCitas(RolUsuario? rol) =>
+      rol == RolUsuario.secretaria_recepcion ||
+      rol == RolUsuario.administradora;
+
+  // Crear citas: solo secretaria
+  static bool puedeCrearCitas(RolUsuario? rol) =>
+      rol == RolUsuario.secretaria_recepcion;
+
+  // Ver citas asignadas (doctora ve solo las suyas)
+  static bool puedeVerCitasAsignadas(RolUsuario? rol) =>
+      rol == RolUsuario.doctora;
 }

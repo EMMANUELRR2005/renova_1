@@ -43,6 +43,12 @@ class _NuevoPacienteScreenState extends ConsumerState<NuevoPacienteScreen> {
   final _contactoTelCtrl = TextEditingController();
   String _contactoRelacion = 'familiar';
 
+  // Servicio y Clínica (nuevos campos obligatorios)
+  String? _servicioId;
+  String? _servicioNombre;
+  String? _clinicaId;
+  String? _clinicaNombre;
+
   @override
   void dispose() {
     for (final c in [
@@ -88,6 +94,14 @@ class _NuevoPacienteScreenState extends ConsumerState<NuevoPacienteScreen> {
       _showError('Selecciona la fecha de nacimiento');
       return;
     }
+    if (_servicioId == null || _servicioNombre == null) {
+      _showError('Selecciona un servicio');
+      return;
+    }
+    if (_clinicaId == null || _clinicaNombre == null) {
+      _showError('Selecciona una clínica');
+      return;
+    }
 
     setState(() => _guardando = true);
 
@@ -123,6 +137,10 @@ class _NuevoPacienteScreenState extends ConsumerState<NuevoPacienteScreen> {
         ),
         estado: 'activo',
         registradoPor: usuario?.id ?? '',
+        servicio: _servicioNombre,
+        servicioId: _servicioId,
+        clinica: _clinicaNombre,
+        clinicaId: _clinicaId,
       );
 
       final nuevoId = await service.crearPaciente(paciente);
@@ -349,22 +367,56 @@ class _NuevoPacienteScreenState extends ConsumerState<NuevoPacienteScreen> {
                   ),
                 ],
               ),
-              const SizedBox(height: 24),
-              // ── Botón Guardar ───────────────────────────────────────────
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: _guardando ? null : _guardar,
-                  child: _guardando
-                      ? const SizedBox(
-                          height: 20,
-                          width: 20,
-                          child: CircularProgressIndicator(
-                              strokeWidth: 2, color: Colors.white),
-                        )
-                      : const Text('Registrar Paciente'),
-                ),
+              const SizedBox(height: 16),
+              // ── Servicio y Clínica (Obligatorios) ───────────────────────
+              _SectionCard(
+                title: 'Asignación de Servicio y Clínica *',
+                children: [
+                  _Row2(
+                    left: _buildServicioDropdown(),
+                    right: _buildClinicaDropdown(),
+                  ),
+                ],
               ),
+              const SizedBox(height: 24),
+              // ── Botones de Acción ───────────────────────────────────────
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  // Botón Cancelar
+                  OutlinedButton(
+                    onPressed: _guardando ? null : () => context.go('/pacientes'),
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 32, vertical: 16),
+                      side: const BorderSide(color: AppColors.border),
+                    ),
+                    child: const Text(
+                      'Cancelar',
+                      style: TextStyle(color: AppColors.textSecondary),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  // Botón Guardar Paciente
+                  ElevatedButton(
+                    onPressed: _guardando ? null : _guardar,
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 32, vertical: 16),
+                    ),
+                    child: _guardando
+                        ? const SizedBox(
+                            height: 20,
+                            width: 20,
+                            child: CircularProgressIndicator(
+                                strokeWidth: 2, color: Colors.white),
+                          )
+                        : const Text('Guardar Paciente'),
+                  ),
+                ],
+              ),
+              // Padding inferior para que el botón no quede pegado al borde
+              const SizedBox(height: 40),
             ],
           ),
         ),
@@ -381,6 +433,80 @@ class _NuevoPacienteScreenState extends ConsumerState<NuevoPacienteScreen> {
         color: AppColors.textSecondary,
         fontFamily: GoogleFonts.dmSans().fontFamily,
       );
+
+  Widget _buildServicioDropdown() {
+    final serviciosAsync = ref.watch(serviciosStreamProvider);
+    return serviciosAsync.when(
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (e, _) => Text('Error: $e'),
+      data: (servicios) {
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Servicio *', style: _labelStyle()),
+            const SizedBox(height: 6),
+            DropdownButtonFormField<String>(
+              value: _servicioId,
+              decoration: const InputDecoration(
+                hintText: 'Selecciona un servicio',
+              ),
+              validator: (v) => v == null ? 'Campo requerido' : null,
+              items: servicios
+                  .map((s) => DropdownMenuItem(
+                        value: s.id,
+                        child: Text(s.nombre),
+                      ))
+                  .toList(),
+              onChanged: (v) {
+                final servicio = servicios.firstWhere((s) => s.id == v);
+                setState(() {
+                  _servicioId = v;
+                  _servicioNombre = servicio.nombre;
+                });
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildClinicaDropdown() {
+    final clinicasAsync = ref.watch(clinicasStreamProvider);
+    return clinicasAsync.when(
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (e, _) => Text('Error: $e'),
+      data: (clinicas) {
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Clínica *', style: _labelStyle()),
+            const SizedBox(height: 6),
+            DropdownButtonFormField<String>(
+              value: _clinicaId,
+              decoration: const InputDecoration(
+                hintText: 'Selecciona una clínica',
+              ),
+              validator: (v) => v == null ? 'Campo requerido' : null,
+              items: clinicas
+                  .map((c) => DropdownMenuItem(
+                        value: c.id,
+                        child: Text(c.nombre),
+                      ))
+                  .toList(),
+              onChanged: (v) {
+                final clinica = clinicas.firstWhere((c) => c.id == v);
+                setState(() {
+                  _clinicaId = v;
+                  _clinicaNombre = clinica.nombre;
+                });
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
 }
 
 // ── Widgets auxiliares ─────────────────────────────────────────────────────
