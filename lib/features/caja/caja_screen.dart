@@ -525,13 +525,11 @@ class _NuevoCobroDialogState extends ConsumerState<_NuevoCobroDialog> {
   String _busqueda = '';
   List<Paciente> _pacientesFiltrados = [];
   bool _buscando = false;
+  final _nitController = TextEditingController(text: 'CF');
 
-  String? _servicioId;
-  String? _servicioNombre;
+  List<ItemVenta> _items = [];
   String? _clinicaId;
   String? _clinicaNombre;
-  final _descripcionController = TextEditingController();
-  final _montoController = TextEditingController();
 
   String _metodoPago = 'efectivo';
   final _referenciaController = TextEditingController();
@@ -543,10 +541,51 @@ class _NuevoCobroDialogState extends ConsumerState<_NuevoCobroDialog> {
 
   bool _guardando = false;
 
+  // Controllers persistentes para campos de monto y descripción
+  final List<TextEditingController> _montoControllers = [];
+  final List<TextEditingController> _descControllers = [];
+
+  double get _subtotal => _items.fold(0, (sum, item) => sum + item.monto);
+  double get _subtotalSinIva => _subtotal / 1.12;
+  double get _iva => _subtotal - _subtotalSinIva;
+  double get _total => _subtotal;
+
   @override
   void initState() {
     super.initState();
+    _items = [_crearItemVacio()];
+    _agregarControllers();
     _cargarCatalogos();
+  }
+
+  void _agregarControllers() {
+    final montoCtrl = TextEditingController();
+    final descCtrl = TextEditingController();
+    _montoControllers.add(montoCtrl);
+    _descControllers.add(descCtrl);
+  }
+
+  @override
+  void dispose() {
+    for (var c in _montoControllers) {
+      c.dispose();
+    }
+    for (var c in _descControllers) {
+      c.dispose();
+    }
+    _nitController.dispose();
+    _referenciaController.dispose();
+    super.dispose();
+  }
+
+  ItemVenta _crearItemVacio() {
+    return ItemVenta(
+      servicioId: '',
+      servicio: '',
+      clinicaId: '',
+      clinica: '',
+      monto: 0,
+    );
   }
 
   Future<void> _cargarCatalogos() async {
@@ -589,12 +628,38 @@ class _NuevoCobroDialogState extends ConsumerState<_NuevoCobroDialog> {
     }
   }
 
+  void _agregarItem() {
+    setState(() {
+      _items.add(_crearItemVacio());
+      _agregarControllers();
+    });
+  }
+
+  void _quitarItem(int index) {
+    if (_items.length > 1) {
+      setState(() {
+        _items.removeAt(index);
+        _montoControllers[index].dispose();
+        _descControllers[index].dispose();
+        _montoControllers.removeAt(index);
+        _descControllers.removeAt(index);
+      });
+    }
+  }
+
+  void _actualizarMontoDesdeController(int index) {
+    if (index < _items.length && index < _montoControllers.length) {
+      final valor = double.tryParse(_montoControllers[index].text) ?? 0;
+      _items[index].monto = valor;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Dialog(
       child: Container(
-        width: 600,
-        constraints: const BoxConstraints(maxHeight: 600),
+        width: 700,
+        constraints: const BoxConstraints(maxHeight: 700),
         padding: const EdgeInsets.all(24),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -656,7 +721,7 @@ class _NuevoCobroDialogState extends ConsumerState<_NuevoCobroDialog> {
       case 1:
         return _buildPaso1Paciente();
       case 2:
-        return _buildPaso2Detalle();
+        return _buildPaso2Servicios();
       case 3:
         return _buildPaso3MetodoPago();
       case 4:
@@ -709,10 +774,6 @@ class _NuevoCobroDialogState extends ConsumerState<_NuevoCobroDialog> {
                   onTap: () {
                     setState(() {
                       _pacienteSeleccionado = p;
-                      if (p.servicioId != null) {
-                        _servicioId = p.servicioId;
-                        _servicioNombre = p.servicio;
-                      }
                       if (p.clinicaId != null) {
                         _clinicaId = p.clinicaId;
                         _clinicaNombre = p.clinica;
@@ -733,11 +794,22 @@ class _NuevoCobroDialogState extends ConsumerState<_NuevoCobroDialog> {
               children: [
                 const Icon(Icons.check_circle, color: AppColors.success),
                 const SizedBox(width: 8),
-                Text(
-                  'Seleccionado: ${_pacienteSeleccionado!.nombreCompleto}',
-                  style: const TextStyle(color: AppColors.success),
+                Expanded(
+                  child: Text(
+                    'Seleccionado: ${_pacienteSeleccionado!.nombreCompleto}',
+                    style: const TextStyle(color: AppColors.success),
+                  ),
                 ),
               ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          TextField(
+            controller: _nitController,
+            decoration: const InputDecoration(
+              labelText: 'NIT del cliente',
+              hintText: 'CF si es consumidor final',
+              border: OutlineInputBorder(),
             ),
           ),
         ],
@@ -745,7 +817,7 @@ class _NuevoCobroDialogState extends ConsumerState<_NuevoCobroDialog> {
     );
   }
 
-  Widget _buildPaso2Detalle() {
+  Widget _buildPaso2Servicios() {
     if (_cargandoCatalogos) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -753,34 +825,27 @@ class _NuevoCobroDialogState extends ConsumerState<_NuevoCobroDialog> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'Detalle del Cobro',
-          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+        Row(
+          children: [
+            const Text(
+              'Servicios a Cobrar',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+            ),
+            const Spacer(),
+            Text(
+              '${_items.length} servicio${_items.length > 1 ? 's' : ''}',
+              style: const TextStyle(color: AppColors.textSecondary),
+            ),
+          ],
         ),
         const SizedBox(height: 16),
-        DropdownButtonFormField<String>(
-          value: _servicioId,
-          decoration: const InputDecoration(
-            labelText: 'Servicio *',
-            border: OutlineInputBorder(),
-          ),
-          items: _servicios
-              .map((s) => DropdownMenuItem(value: s.id, child: Text(s.nombre)))
-              .toList(),
-          onChanged: (v) {
-            final servicio = _servicios.firstWhere((s) => s.id == v);
-            setState(() {
-              _servicioId = v;
-              _servicioNombre = servicio.nombre;
-            });
-          },
-        ),
-        const SizedBox(height: 16),
+
         DropdownButtonFormField<String>(
           value: _clinicaId,
           decoration: const InputDecoration(
             labelText: 'Clínica *',
             border: OutlineInputBorder(),
+            isDense: true,
           ),
           items: _clinicas
               .map((c) => DropdownMenuItem(value: c.id, child: Text(c.nombre)))
@@ -790,33 +855,189 @@ class _NuevoCobroDialogState extends ConsumerState<_NuevoCobroDialog> {
             setState(() {
               _clinicaId = v;
               _clinicaNombre = clinica.nombre;
+              for (var item in _items) {
+                item.clinicaId = v!;
+                item.clinica = clinica.nombre;
+              }
             });
           },
         ),
         const SizedBox(height: 16),
-        TextField(
-          controller: _descripcionController,
-          decoration: const InputDecoration(
-            labelText: 'Descripción del cobro',
-            hintText: 'Ej: Consulta general + laboratorio',
-            border: OutlineInputBorder(),
+
+        ..._items.asMap().entries.map((entry) {
+          final index = entry.key;
+          final item = entry.value;
+          return _buildItemCard(index, item);
+        }),
+
+        const SizedBox(height: 12),
+
+        Center(
+          child: TextButton.icon(
+            onPressed: _agregarItem,
+            icon: const Icon(Icons.add_circle_outline),
+            label: const Text('+ Agregar otro servicio'),
+            style: TextButton.styleFrom(
+              foregroundColor: const Color(0xFF1E3A5F),
+            ),
           ),
-          maxLines: 2,
         ),
-        const SizedBox(height: 16),
-        TextField(
-          controller: _montoController,
-          decoration: const InputDecoration(
-            labelText: 'Monto (Q) *',
-            prefixText: 'Q ',
-            border: OutlineInputBorder(),
-          ),
-          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-          inputFormatters: [
-            FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}')),
+
+        const Divider(thickness: 1, height: 32),
+
+        _buildTotales(),
+      ],
+    );
+  }
+
+  Widget _buildItemCard(int index, ItemVenta item) {
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Text(
+                  'Servicio ${index + 1}',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 13,
+                  ),
+                ),
+                const Spacer(),
+                if (_items.length > 1)
+                  IconButton(
+                    onPressed: () => _quitarItem(index),
+                    icon: const Icon(Icons.delete_outline, color: Colors.red, size: 20),
+                    tooltip: 'Quitar servicio',
+                    visualDensity: VisualDensity.compact,
+                  ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(
+                  flex: 3,
+                  child: DropdownButtonFormField<String>(
+                    value: item.servicioId.isEmpty ? null : item.servicioId,
+                    decoration: const InputDecoration(
+                      labelText: 'Servicio *',
+                      border: OutlineInputBorder(),
+                      isDense: true,
+                      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                    ),
+                    hint: const Text('Selecciona'),
+                    items: _servicios.map((s) {
+                      return DropdownMenuItem<String>(
+                        value: s.id,
+                        child: Text(s.nombre, overflow: TextOverflow.ellipsis),
+                      );
+                    }).toList(),
+                    onChanged: (value) {
+                      if (value != null) {
+                        final servicio = _servicios.firstWhere((s) => s.id == value);
+                        setState(() {
+                          _items[index].servicioId = value;
+                          _items[index].servicio = servicio.nombre;
+                        });
+                      }
+                    },
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  flex: 2,
+                  child: TextFormField(
+                    controller: _montoControllers[index],
+                    decoration: const InputDecoration(
+                      labelText: 'Monto (Q) *',
+                      border: OutlineInputBorder(),
+                      prefixText: 'Q ',
+                      isDense: true,
+                      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                    ),
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    inputFormatters: [
+                      FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
+                    ],
+                    onChanged: (value) {
+                      _items[index].monto = double.tryParse(value) ?? 0;
+                      setState(() {});
+                    },
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            TextFormField(
+              controller: _descControllers[index],
+              decoration: const InputDecoration(
+                labelText: 'Descripción (opcional)',
+                border: OutlineInputBorder(),
+                isDense: true,
+                contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+              ),
+              onChanged: (value) {
+                _items[index].descripcion = value;
+              },
+            ),
           ],
         ),
-      ],
+      ),
+    );
+  }
+
+  Widget _buildTotales() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.card,
+        border: Border.all(color: AppColors.border),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Column(
+        children: [
+          _buildTotalRow('Subtotal (sin IVA):', 'Q ${_subtotalSinIva.toStringAsFixed(2)}'),
+          _buildTotalRow('IVA (12%):', 'Q ${_iva.toStringAsFixed(2)}'),
+          const Divider(),
+          _buildTotalRow(
+            'TOTAL:',
+            'Q ${_total.toStringAsFixed(2)}',
+            esBold: true,
+            fontSize: 16,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTotalRow(String label, String value, {bool esBold = false, double fontSize = 14}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: fontSize,
+              fontWeight: esBold ? FontWeight.bold : FontWeight.normal,
+            ),
+          ),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: fontSize,
+              fontWeight: esBold ? FontWeight.bold : FontWeight.normal,
+              color: esBold ? AppColors.primary : null,
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -894,8 +1115,6 @@ class _NuevoCobroDialogState extends ConsumerState<_NuevoCobroDialog> {
   }
 
   Widget _buildPaso4Confirmacion() {
-    final monto = double.tryParse(_montoController.text) ?? 0;
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -912,18 +1131,40 @@ class _NuevoCobroDialogState extends ConsumerState<_NuevoCobroDialog> {
             borderRadius: BorderRadius.circular(10),
           ),
           child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               _ConfirmRow('Paciente', _pacienteSeleccionado?.nombreCompleto ?? ''),
-              _ConfirmRow('Servicio', _servicioNombre ?? ''),
+              _ConfirmRow('NIT', _nitController.text.isEmpty ? 'CF' : _nitController.text),
               _ConfirmRow('Clínica', _clinicaNombre ?? ''),
-              if (_descripcionController.text.isNotEmpty)
-                _ConfirmRow('Descripción', _descripcionController.text),
-              _ConfirmRow('Monto', 'Q ${monto.toStringAsFixed(2)}'),
+              const Divider(),
+              const Text(
+                'Servicios:',
+                style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+              ),
+              const SizedBox(height: 8),
+              ..._items.map((item) => Padding(
+                    padding: const EdgeInsets.only(left: 8, bottom: 4),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.check, size: 16, color: AppColors.success),
+                        const SizedBox(width: 8),
+                        Expanded(child: Text(item.servicio)),
+                        Text(
+                          'Q ${item.monto.toStringAsFixed(2)}',
+                          style: const TextStyle(fontWeight: FontWeight.w600),
+                        ),
+                      ],
+                    ),
+                  )),
+              const Divider(),
+              _ConfirmRow('Subtotal', 'Q ${_subtotalSinIva.toStringAsFixed(2)}'),
+              _ConfirmRow('IVA (12%)', 'Q ${_iva.toStringAsFixed(2)}'),
+              _ConfirmRow('Total', 'Q ${_total.toStringAsFixed(2)}'),
+              const Divider(),
               _ConfirmRow('Método', _getMetodoLabel()),
               if (_metodoPago != 'efectivo' && _referenciaController.text.isNotEmpty)
                 _ConfirmRow('Referencia', _referenciaController.text),
-              if (_metodoPago == 'visa_cuotas')
-                _ConfirmRow('Cuotas', '$_cuotas'),
+              if (_metodoPago == 'visa_cuotas') _ConfirmRow('Cuotas', '$_cuotas'),
             ],
           ),
         ),
@@ -982,10 +1223,9 @@ class _NuevoCobroDialogState extends ConsumerState<_NuevoCobroDialog> {
       case 1:
         return _pacienteSeleccionado != null;
       case 2:
-        return _servicioId != null &&
-            _clinicaId != null &&
-            _montoController.text.isNotEmpty &&
-            (double.tryParse(_montoController.text) ?? 0) > 0;
+        return _clinicaId != null &&
+            _items.isNotEmpty &&
+            _items.every((item) => item.servicioId.isNotEmpty && item.monto > 0);
       case 3:
         return true;
       default:
@@ -999,19 +1239,27 @@ class _NuevoCobroDialogState extends ConsumerState<_NuevoCobroDialog> {
     try {
       final usuario = ref.read(usuarioActivoProvider);
       final correlativo = await VentaService().generarCorrelativo();
-      final monto = double.tryParse(_montoController.text) ?? 0;
+
+      for (var item in _items) {
+        item.clinicaId = _clinicaId ?? '';
+        item.clinica = _clinicaNombre ?? '';
+      }
 
       final venta = Venta(
         id: '',
         pacienteId: _pacienteSeleccionado!.id,
         nombrePaciente: _pacienteSeleccionado!.nombreCompleto,
         telefonoPaciente: _pacienteSeleccionado!.telefono,
-        servicio: _servicioNombre ?? '',
-        servicioId: _servicioId ?? '',
+        nitCliente: _nitController.text.trim().isEmpty ? 'CF' : _nitController.text.trim(),
+        items: _items,
+        servicio: _items.first.servicio,
+        servicioId: _items.first.servicioId,
         clinica: _clinicaNombre ?? '',
         clinicaId: _clinicaId ?? '',
-        descripcion: _descripcionController.text,
-        monto: monto,
+        descripcion: _items.map((i) => i.descripcion).where((d) => d.isNotEmpty).join(', '),
+        subtotalSinIva: _subtotalSinIva,
+        iva: _iva,
+        monto: _total,
         metodoPago: _metodoPago,
         cuotas: _metodoPago == 'visa_cuotas' ? _cuotas : 0,
         referencia: _referenciaController.text,

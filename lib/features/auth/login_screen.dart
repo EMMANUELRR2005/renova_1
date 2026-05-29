@@ -158,27 +158,18 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   // Logo
-                  Container(
-                    width: 80,
-                    height: 80,
-                    decoration: BoxDecoration(
-                      color: AppColors.primary,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: const Center(
-                      child: Text(
-                        '✨',
-                        style: TextStyle(
-                          fontSize: 48,
-                          color: Colors.white,
-                        ),
-                      ),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(16),
+                    child: Image.asset(
+                      'assets/images/logo_renova.png',
+                      height: 120,
+                      fit: BoxFit.contain,
                     ),
                   ),
                   const SizedBox(height: 24),
                   // Nombre clínica
                   Text(
-                    'Clínica\nRenova',
+                    'Clínica Renova',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 24,

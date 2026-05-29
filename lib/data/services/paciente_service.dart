@@ -170,4 +170,29 @@ class PacienteService {
             p.numeroIdentificacion.contains(query))
         .toList();
   }
+
+  Future<int> contarPacientesActivos() async {
+    final snap = await _db
+        .collection('pacientes')
+        .where('estado', isEqualTo: 'activo')
+        .get();
+    return snap.docs.length;
+  }
+
+  Future<int> contarPacientesNuevosMes() async {
+    final inicioMes = DateTime(DateTime.now().year, DateTime.now().month, 1);
+    final snap = await _db.collection('pacientes').get();
+
+    int count = 0;
+    for (final doc in snap.docs) {
+      final data = doc.data();
+      final fechaCreacion = data['fechaCreacion'];
+      if (fechaCreacion != null && fechaCreacion is Timestamp) {
+        if (fechaCreacion.toDate().isAfter(inicioMes.subtract(const Duration(seconds: 1)))) {
+          count++;
+        }
+      }
+    }
+    return count;
+  }
 }

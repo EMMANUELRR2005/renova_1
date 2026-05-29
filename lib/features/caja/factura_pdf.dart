@@ -1,3 +1,4 @@
+import 'package:flutter/services.dart' show rootBundle;
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
@@ -18,14 +19,23 @@ class FacturaPDF {
 
     final pdf = pw.Document();
 
+    // Cargar logo desde assets
+    pw.MemoryImage? logoImage;
+    try {
+      final logoData = await rootBundle.load('assets/images/logo_renova.png');
+      logoImage = pw.MemoryImage(logoData.buffer.asUint8List());
+    } catch (e) {
+      // Si no se puede cargar el logo, continuar sin él
+    }
+
     final colorPrimario = PdfColor.fromHex('#1E3A5F');
     final colorDorado = PdfColor.fromHex('#C9A96E');
     final colorGris = PdfColor.fromHex('#F5F5F5');
     final colorTexto = PdfColor.fromHex('#333333');
 
     final total = venta.monto;
-    final iva = total - (total / 1.12);
-    final subtotal = total - iva;
+    final subtotal = venta.subtotalSinIva > 0 ? venta.subtotalSinIva : total / 1.12;
+    final iva = venta.iva > 0 ? venta.iva : total - subtotal;
 
     pdf.addPage(
       pw.Page(
@@ -46,23 +56,34 @@ class FacturaPDF {
                 child: pw.Row(
                   mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                   children: [
-                    pw.Column(
-                      crossAxisAlignment: pw.CrossAxisAlignment.start,
+                    pw.Row(
                       children: [
-                        pw.Text(
-                          'CLINICA RENOVA',
-                          style: pw.TextStyle(
-                            color: PdfColors.white,
-                            fontSize: 22,
-                            fontWeight: pw.FontWeight.bold,
+                        if (logoImage != null)
+                          pw.ClipRRect(
+                            horizontalRadius: 6,
+                            verticalRadius: 6,
+                            child: pw.Image(logoImage, height: 50, width: 50),
                           ),
-                        ),
-                        pw.Text(
-                          'Belleza y Bienestar',
-                          style: pw.TextStyle(
-                            color: colorDorado,
-                            fontSize: 12,
-                          ),
+                        if (logoImage != null) pw.SizedBox(width: 12),
+                        pw.Column(
+                          crossAxisAlignment: pw.CrossAxisAlignment.start,
+                          children: [
+                            pw.Text(
+                              'CLINICA RENOVA',
+                              style: pw.TextStyle(
+                                color: PdfColors.white,
+                                fontSize: 22,
+                                fontWeight: pw.FontWeight.bold,
+                              ),
+                            ),
+                            pw.Text(
+                              'Belleza y Bienestar',
+                              style: pw.TextStyle(
+                                color: colorDorado,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
                         ),
                       ],
                     ),
@@ -187,7 +208,7 @@ class FacturaPDF {
                     ),
                   ),
                   pw.Text(
-                    'CF',
+                    venta.nitCliente.isNotEmpty ? venta.nitCliente : 'CF',
                     style: const pw.TextStyle(fontSize: 11),
                   ),
                 ],
@@ -266,66 +287,8 @@ class FacturaPDF {
                 ),
               ),
 
-              // Fila del servicio
-              pw.Container(
-                padding: const pw.EdgeInsets.symmetric(
-                  horizontal: 8,
-                  vertical: 8,
-                ),
-                color: colorGris,
-                child: pw.Row(
-                  children: [
-                    pw.Expanded(
-                      flex: 5,
-                      child: pw.Column(
-                        crossAxisAlignment: pw.CrossAxisAlignment.start,
-                        children: [
-                          pw.Text(
-                            venta.servicio.isNotEmpty
-                                ? venta.servicio
-                                : 'Servicio medico',
-                            style: pw.TextStyle(
-                              fontSize: 10,
-                              fontWeight: pw.FontWeight.bold,
-                            ),
-                          ),
-                          if (venta.descripcion.isNotEmpty)
-                            pw.Text(
-                              venta.descripcion,
-                              style: const pw.TextStyle(
-                                fontSize: 9,
-                                color: PdfColors.grey700,
-                              ),
-                            ),
-                        ],
-                      ),
-                    ),
-                    pw.Expanded(
-                      child: pw.Text(
-                        '1',
-                        style: const pw.TextStyle(fontSize: 10),
-                        textAlign: pw.TextAlign.center,
-                      ),
-                    ),
-                    pw.Expanded(
-                      flex: 2,
-                      child: pw.Text(
-                        'Q${subtotal.toStringAsFixed(2)}',
-                        style: const pw.TextStyle(fontSize: 10),
-                        textAlign: pw.TextAlign.right,
-                      ),
-                    ),
-                    pw.Expanded(
-                      flex: 2,
-                      child: pw.Text(
-                        'Q${subtotal.toStringAsFixed(2)}',
-                        style: const pw.TextStyle(fontSize: 10),
-                        textAlign: pw.TextAlign.right,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+              // Filas de servicios (múltiples items)
+              ...(_buildFilasServicios(venta, colorGris)),
 
               pw.SizedBox(height: 16),
 
@@ -448,6 +411,82 @@ class FacturaPDF {
       onLayout: (format) async => pdf.save(),
       name: 'Factura_${venta.numeroCorrelativo.replaceAll('VTA', 'FAC')}.pdf',
     );
+  }
+
+  static List<pw.Widget> _buildFilasServicios(Venta venta, PdfColor colorGris) {
+    final items = venta.items.isNotEmpty
+        ? venta.items
+        : [
+            ItemVenta(
+              servicioId: venta.servicioId,
+              servicio: venta.servicio,
+              clinicaId: venta.clinicaId,
+              clinica: venta.clinica,
+              descripcion: venta.descripcion,
+              monto: venta.monto,
+            )
+          ];
+
+    return items.asMap().entries.map((entry) {
+      final index = entry.key;
+      final item = entry.value;
+      final precioUnitario = item.monto / 1.12;
+
+      return pw.Container(
+        padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+        color: index % 2 == 0 ? colorGris : PdfColors.white,
+        child: pw.Row(
+          children: [
+            pw.Expanded(
+              flex: 5,
+              child: pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                children: [
+                  pw.Text(
+                    item.servicio.isNotEmpty ? item.servicio : 'Servicio medico',
+                    style: pw.TextStyle(
+                      fontSize: 10,
+                      fontWeight: pw.FontWeight.bold,
+                    ),
+                  ),
+                  if (item.descripcion.isNotEmpty)
+                    pw.Text(
+                      item.descripcion,
+                      style: const pw.TextStyle(
+                        fontSize: 9,
+                        color: PdfColors.grey700,
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            pw.Expanded(
+              child: pw.Text(
+                '1',
+                style: const pw.TextStyle(fontSize: 10),
+                textAlign: pw.TextAlign.center,
+              ),
+            ),
+            pw.Expanded(
+              flex: 2,
+              child: pw.Text(
+                'Q${precioUnitario.toStringAsFixed(2)}',
+                style: const pw.TextStyle(fontSize: 10),
+                textAlign: pw.TextAlign.right,
+              ),
+            ),
+            pw.Expanded(
+              flex: 2,
+              child: pw.Text(
+                'Q${precioUnitario.toStringAsFixed(2)}',
+                style: const pw.TextStyle(fontSize: 10),
+                textAlign: pw.TextAlign.right,
+              ),
+            ),
+          ],
+        ),
+      );
+    }).toList();
   }
 
   static pw.Widget _filaTotales(

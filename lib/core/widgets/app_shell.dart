@@ -39,26 +39,17 @@ class AppShell extends ConsumerWidget {
                   padding: const EdgeInsets.all(16),
                   child: Column(
                     children: [
-                      Container(
-                        width: 50,
-                        height: 50,
-                        decoration: BoxDecoration(
-                          color: AppColors.primary,
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: const Center(
-                          child: Text(
-                            '✨',
-                            style: TextStyle(
-                              fontSize: 28,
-                              color: Colors.white,
-                            ),
-                          ),
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: Image.asset(
+                          'assets/images/logo_renova.png',
+                          height: 60,
+                          fit: BoxFit.contain,
                         ),
                       ),
                       const SizedBox(height: 12),
                       Text(
-                        'Clínica\nRenova',
+                        'Clínica Renova',
                         textAlign: TextAlign.center,
                         style: TextStyle(
                           fontSize: 12,
@@ -98,21 +89,12 @@ class AppShell extends ConsumerWidget {
                       // Left
                       Row(
                         children: [
-                          Container(
-                            width: 40,
-                            height: 40,
-                            decoration: BoxDecoration(
-                              color: AppColors.primary,
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            child: const Center(
-                              child: Text(
-                                '✨',
-                                style: TextStyle(
-                                  fontSize: 20,
-                                  color: Colors.white,
-                                ),
-                              ),
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(8),
+                            child: Image.asset(
+                              'assets/images/logo_renova.png',
+                              height: 36,
+                              fit: BoxFit.contain,
                             ),
                           ),
                           const SizedBox(width: 12),
