@@ -7,6 +7,9 @@ import '../services/cita_service.dart';
 import '../services/sesion_service.dart';
 import '../services/usuario_service.dart';
 import '../services/catalogo_service.dart';
+import '../services/venta_service.dart';
+import '../services/expediente_service.dart';
+import '../services/reporte_service.dart';
 import '../../features/auth/providers/auth_provider.dart';
 
 // ============================================================================
@@ -262,4 +265,69 @@ final citasDoctoraStreamProvider = StreamProvider<List<CitaMedica>>((ref) {
   if (usuario == null) return const Stream.empty();
   return ref.watch(citaServiceProvider).streamCitasDoctora(usuario.id);
 });
+
+// ============================================================================
+// VENTAS / CAJA (SECRETARIA)
+// ============================================================================
+
+final ventaServiceProvider = Provider((ref) => VentaService());
+
+final filtroVentasProvider = StateProvider<String>((ref) => 'hoy');
+
+final ventasStreamProvider = StreamProvider<List<Venta>>((ref) {
+  final usuario = ref.watch(usuarioActivoProvider);
+  if (usuario == null) return const Stream.empty();
+
+  final filtro = ref.watch(filtroVentasProvider);
+  final ventaService = ref.watch(ventaServiceProvider);
+
+  switch (filtro) {
+    case 'hoy':
+      return ventaService.streamVentasHoy();
+    case 'semana':
+      return ventaService.streamVentasSemana();
+    case 'todas':
+    default:
+      return ventaService.streamTodasLasVentas();
+  }
+});
+
+// ============================================================================
+// EXPEDIENTES
+// ============================================================================
+
+final expedienteServiceProvider = Provider((ref) => ExpedienteService());
+
+final filtroExpedientesProvider = StateProvider<String>((ref) => 'todos');
+
+final expedientesStreamProvider = StreamProvider<List<Expediente>>((ref) {
+  final usuario = ref.watch(usuarioActivoProvider);
+  if (usuario == null) return const Stream.empty();
+
+  final filtro = ref.watch(filtroExpedientesProvider);
+  return ref.watch(expedienteServiceProvider).streamExpedientes(
+      filtroEstado: filtro == 'todos' ? null : filtro);
+});
+
+final selectedExpedienteIdProvider = StateProvider<String?>((ref) => null);
+
+final expedienteByIdProvider =
+    StreamProvider.family<Expediente?, String>((ref, id) {
+  final usuario = ref.watch(usuarioActivoProvider);
+  if (usuario == null) return const Stream.empty();
+  return ref.watch(expedienteServiceProvider).streamExpedienteById(id);
+});
+
+final entradasExpedienteProvider =
+    StreamProvider.family<List<EntradaExpediente>, String>((ref, expedienteId) {
+  final usuario = ref.watch(usuarioActivoProvider);
+  if (usuario == null) return const Stream.empty();
+  return ref.watch(expedienteServiceProvider).streamEntradas(expedienteId);
+});
+
+// ============================================================================
+// REPORTES (ADMINISTRADORA)
+// ============================================================================
+
+final reporteServiceProvider = Provider((ref) => ReporteService());
 

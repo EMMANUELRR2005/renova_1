@@ -205,6 +205,7 @@ class AppShell extends ConsumerWidget {
       BuildContext context, WidgetRef ref, RolUsuario? rol, Function(int) onNavigate, int selectedIndex) {
     final items = <Widget>[];
 
+    // ADMINISTRADORA: Dashboard, Usuarios, Reportes
     if (rol == RolUsuario.administradora) {
       items.addAll([
         SidebarItem(
@@ -217,68 +218,31 @@ class AppShell extends ConsumerWidget {
           },
         ),
         SidebarItem(
-          icon: '👥',
-          label: 'Pacientes',
+          icon: '👨‍💼',
+          label: 'Usuarios',
           isActive: selectedIndex == 1,
           onTap: () {
             onNavigate(1);
-            context.go('/pacientes');
-          },
-        ),
-        SidebarItem(
-          icon: '📅',
-          label: 'Citas',
-          isActive: selectedIndex == 2,
-          onTap: () {
-            onNavigate(2);
-            context.go('/citas');
-          },
-        ),
-        SidebarItem(
-          icon: '📋',
-          label: 'Expedientes',
-          isActive: selectedIndex == 3,
-          onTap: () {
-            onNavigate(3);
-            context.go('/expedientes');
-          },
-        ),
-        SidebarItem(
-          icon: '💰',
-          label: 'Caja',
-          isActive: selectedIndex == 4,
-          onTap: () {
-            onNavigate(4);
-            context.go('/caja');
+            context.go('/usuarios');
           },
         ),
         SidebarItem(
           icon: '📈',
           label: 'Reportes',
-          isActive: selectedIndex == 5,
-          onTap: () => onNavigate(5),
-        ),
-        SidebarItem(
-          icon: '👨‍💼',
-          label: 'Usuarios',
-          isActive: selectedIndex == 6,
+          isActive: selectedIndex == 2,
           onTap: () {
-            onNavigate(6);
-            context.go('/usuarios');
+            onNavigate(2);
+            context.go('/reportes');
           },
         ),
         const Padding(
           padding: EdgeInsets.symmetric(vertical: 8),
           child: Divider(color: Color(0xFF1A3F5C)),
         ),
-        SidebarItem(
-          icon: '⚙️',
-          label: 'Configuración',
-          isActive: selectedIndex == 7,
-          onTap: () => onNavigate(7),
-        ),
       ]);
-    } else if (rol == RolUsuario.enfermera) {
+    }
+    // SECRETARIA: Pacientes, Citas, Caja
+    else if (rol == RolUsuario.secretaria_recepcion) {
       items.addAll([
         SidebarItem(
           icon: '👥',
@@ -292,6 +256,69 @@ class AppShell extends ConsumerWidget {
         SidebarItem(
           icon: '📅',
           label: 'Citas',
+          isActive: selectedIndex == 1,
+          onTap: () {
+            onNavigate(1);
+            context.go('/citas');
+          },
+        ),
+        SidebarItem(
+          icon: '💰',
+          label: 'Caja',
+          isActive: selectedIndex == 2,
+          onTap: () {
+            onNavigate(2);
+            context.go('/caja');
+          },
+        ),
+        const Padding(
+          padding: EdgeInsets.symmetric(vertical: 8),
+          child: Divider(color: Color(0xFF1A3F5C)),
+        ),
+      ]);
+    }
+    // ENFERMERA: Pacientes, Expedientes
+    else if (rol == RolUsuario.enfermera) {
+      items.addAll([
+        SidebarItem(
+          icon: '👥',
+          label: 'Pacientes',
+          isActive: selectedIndex == 0,
+          onTap: () {
+            onNavigate(0);
+            context.go('/pacientes');
+          },
+        ),
+        SidebarItem(
+          icon: '📋',
+          label: 'Expedientes',
+          isActive: selectedIndex == 1,
+          onTap: () {
+            onNavigate(1);
+            context.go('/expedientes');
+          },
+        ),
+        const Padding(
+          padding: EdgeInsets.symmetric(vertical: 8),
+          child: Divider(color: Color(0xFF1A3F5C)),
+        ),
+      ]);
+    }
+    // DOCTORA: Pacientes, Citas (sus citas), Expedientes
+    else if (rol == RolUsuario.doctora) {
+      items.addAll([
+        SidebarItem(
+          icon: '👥',
+          label: 'Pacientes',
+          isActive: selectedIndex == 0,
+          onTap: () {
+            onNavigate(0);
+            context.go('/pacientes');
+          },
+        ),
+        SidebarItem(
+          icon: '📅',
+          label: 'Mis Citas',
           isActive: selectedIndex == 1,
           onTap: () {
             onNavigate(1);
@@ -312,48 +339,9 @@ class AppShell extends ConsumerWidget {
           child: Divider(color: Color(0xFF1A3F5C)),
         ),
       ]);
-    } else if (rol == RolUsuario.secretaria_recepcion) {
-      items.addAll([
-        SidebarItem(
-          icon: '👥',
-          label: 'Pacientes',
-          isActive: selectedIndex == 0,
-          onTap: () {
-            onNavigate(0);
-            context.go('/pacientes');
-          },
-        ),
-        SidebarItem(
-          icon: '📅',
-          label: 'Citas',
-          isActive: selectedIndex == 1,
-          onTap: () {
-            onNavigate(1);
-            context.go('/citas');
-          },
-        ),
-        const Padding(
-          padding: EdgeInsets.symmetric(vertical: 8),
-          child: Divider(color: Color(0xFF1A3F5C)),
-        ),
-      ]);
-    } else if (rol == RolUsuario.doctora) {
-      items.addAll([
-        SidebarItem(
-          icon: '👥',
-          label: 'Pacientes',
-          isActive: selectedIndex == 0,
-          onTap: () {
-            onNavigate(0);
-            context.go('/pacientes');
-          },
-        ),
-        const Padding(
-          padding: EdgeInsets.symmetric(vertical: 8),
-          child: Divider(color: Color(0xFF1A3F5C)),
-        ),
-      ]);
-    } else if (rol == RolUsuario.terapeuta) {
+    }
+    // TERAPEUTA: Mi Agenda
+    else if (rol == RolUsuario.terapeuta) {
       items.addAll([
         SidebarItem(
           icon: '📅',
@@ -378,8 +366,6 @@ class AppShell extends ConsumerWidget {
         label: 'Cerrar sesión',
         isActive: false,
         onTap: () async {
-          // Llama signOut() en Firebase Auth y limpia usuarioActivoProvider.
-          // GoRouter detecta authState = false y redirige a /login automáticamente.
           await ref.read(logoutProvider)();
         },
       ),

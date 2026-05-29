@@ -8,6 +8,7 @@ import '../../core/theme/app_theme.dart';
 import '../../core/widgets/app_shell.dart';
 import '../../data/mock/mock_data.dart';
 import '../../data/mock/providers.dart';
+import '../../data/services/catalogo_service.dart';
 import '../../features/auth/providers/auth_provider.dart';
 
 class DetallePacienteScreen extends ConsumerWidget {
@@ -566,119 +567,188 @@ void _mostrarDialogInactivar(
   Paciente paciente,
   Usuario usuario,
 ) {
-  String? servicioId;
-  String? servicioNombre;
-
   showDialog(
     context: context,
     builder: (ctx) {
-      return StatefulBuilder(
-        builder: (context, setDialogState) {
-          final serviciosAsync = ref.watch(serviciosStreamProvider);
-
-          return AlertDialog(
-            title: const Text('Inactivar Paciente'),
-            content: SizedBox(
-              width: 400,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    '¿Confirmar cambio a Inactivo para ${paciente.nombreCompleto}?',
-                    style: const TextStyle(fontSize: 14),
-                  ),
-                  const SizedBox(height: 16),
-                  const Text(
-                    'Servicio realizado *',
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w500,
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  serviciosAsync.when(
-                    loading: () =>
-                        const Center(child: CircularProgressIndicator()),
-                    error: (e, _) => Text('Error: $e'),
-                    data: (servicios) {
-                      return DropdownButtonFormField<String>(
-                        value: servicioId,
-                        decoration: const InputDecoration(
-                          hintText: 'Selecciona el servicio realizado',
-                          border: OutlineInputBorder(),
-                        ),
-                        items: servicios
-                            .map((s) => DropdownMenuItem(
-                                  value: s.id,
-                                  child: Text(s.nombre),
-                                ))
-                            .toList(),
-                        onChanged: (v) {
-                          final servicio =
-                              servicios.firstWhere((s) => s.id == v);
-                          setDialogState(() {
-                            servicioId = v;
-                            servicioNombre = servicio.nombre;
-                          });
-                        },
-                      );
-                    },
-                  ),
-                ],
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(ctx).pop(),
-                child: const Text('Cancelar'),
-              ),
-              ElevatedButton(
-                onPressed: servicioId == null
-                    ? null
-                    : () async {
-                        try {
-                          await ref
-                              .read(pacienteServiceProvider)
-                              .inactivarPaciente(
-                                pacienteId: paciente.id,
-                                servicioRealizado: servicioNombre!,
-                                servicioRealizadoId: servicioId!,
-                                enfermeraUid: usuario.id,
-                                nombreEnfermera: usuario.nombre,
-                              );
-                          if (ctx.mounted) {
-                            Navigator.of(ctx).pop();
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Paciente inactivado'),
-                                backgroundColor: AppColors.success,
-                              ),
-                            );
-                          }
-                        } catch (e) {
-                          if (ctx.mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text('Error: $e'),
-                                backgroundColor: AppColors.danger,
-                              ),
-                            );
-                          }
-                        }
-                      },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.danger,
-                ),
-                child: const Text('Confirmar Inactivación'),
-              ),
-            ],
-          );
+      return _InactivarPacienteDialog(
+        paciente: paciente,
+        usuario: usuario,
+        onConfirmar: (servicioId, servicioNombre) async {
+          await ref.read(pacienteServiceProvider).inactivarPaciente(
+                pacienteId: paciente.id,
+                servicioRealizado: servicioNombre,
+                servicioRealizadoId: servicioId,
+                enfermeraUid: usuario.id,
+                nombreEnfermera: usuario.nombre,
+              );
         },
       );
     },
   );
+}
+
+class _InactivarPacienteDialog extends StatefulWidget {
+  final Paciente paciente;
+  final Usuario usuario;
+  final Future<void> Function(String servicioId, String servicioNombre) onConfirmar;
+
+  const _InactivarPacienteDialog({
+    required this.paciente,
+    required this.usuario,
+    required this.onConfirmar,
+  });
+
+  @override
+  State<_InactivarPacienteDialog> createState() => _InactivarPacienteDialogState();
+}
+
+class _InactivarPacienteDialogState extends State<_InactivarPacienteDialog> {
+  String? _servicioId;
+  String? _servicioNombre;
+  List<ServicioClinica> _servicios = [];
+  bool _cargando = true;
+  bool _guardando = false;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _cargarServicios();
+  }
+
+  Future<void> _cargarServicios() async {
+    try {
+      final servicios = await CatalogoService().getServicios();
+      if (mounted) {
+        setState(() {
+          _servicios = servicios;
+          _cargando = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _error = e.toString();
+          _cargando = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _confirmar() async {
+    if (_servicioId == null || _servicioNombre == null) return;
+
+    setState(() => _guardando = true);
+    try {
+      await widget.onConfirmar(_servicioId!, _servicioNombre!);
+      if (mounted) {
+        Navigator.of(context).pop();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Paciente inactivado'),
+            backgroundColor: AppColors.success,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _guardando = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: $e'),
+            backgroundColor: AppColors.danger,
+          ),
+        );
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Inactivar Paciente'),
+      content: SizedBox(
+        width: 400,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '¿Confirmar cambio a Inactivo para ${widget.paciente.nombreCompleto}?',
+              style: const TextStyle(fontSize: 14),
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'Servicio realizado *',
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+                color: AppColors.textSecondary,
+              ),
+            ),
+            const SizedBox(height: 8),
+            if (_cargando)
+              const Center(
+                child: Padding(
+                  padding: EdgeInsets.all(16),
+                  child: CircularProgressIndicator(),
+                ),
+              )
+            else if (_error != null)
+              Text('Error: $_error', style: const TextStyle(color: AppColors.danger))
+            else if (_servicios.isEmpty)
+              const Text(
+                'No hay servicios disponibles',
+                style: TextStyle(color: AppColors.textSecondary),
+              )
+            else
+              DropdownButtonFormField<String>(
+                value: _servicioId,
+                decoration: const InputDecoration(
+                  hintText: 'Selecciona el servicio realizado',
+                  border: OutlineInputBorder(),
+                ),
+                items: _servicios
+                    .map((s) => DropdownMenuItem(
+                          value: s.id,
+                          child: Text(s.nombre),
+                        ))
+                    .toList(),
+                onChanged: (v) {
+                  final servicio = _servicios.firstWhere((s) => s.id == v);
+                  setState(() {
+                    _servicioId = v;
+                    _servicioNombre = servicio.nombre;
+                  });
+                },
+              ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: _guardando ? null : () => Navigator.of(context).pop(),
+          child: const Text('Cancelar'),
+        ),
+        ElevatedButton(
+          onPressed: (_servicioId == null || _guardando) ? null : _confirmar,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppColors.danger,
+          ),
+          child: _guardando
+              ? const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: Colors.white,
+                  ),
+                )
+              : const Text('Confirmar Inactivación'),
+        ),
+      ],
+    );
+  }
 }
 
 void _mostrarDialogReactivar(

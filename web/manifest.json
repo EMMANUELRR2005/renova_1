@@ -1,12 +1,12 @@
 {
-    "name": "renova_1",
-    "short_name": "renova_1",
+    "name": "Clinica Renova",
+    "short_name": "Renova",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
-    "orientation": "portrait-primary",
+    "background_color": "#1E3A5F",
+    "theme_color": "#1E3A5F",
+    "description": "Sistema de Gestion Clinica - Belleza y Bienestar",
+    "orientation": "landscape-primary",
     "prefer_related_applications": false,
     "icons": [
         {

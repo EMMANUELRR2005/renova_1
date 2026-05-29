@@ -5,10 +5,7 @@ import 'package:flutter/foundation.dart'
 class DefaultFirebaseOptions {
   static FirebaseOptions get currentPlatform {
     if (kIsWeb) {
-      throw UnsupportedError(
-        'DefaultFirebaseOptions no está configurado para web. '
-        'Registra la app web en Firebase Console.',
-      );
+      return web;
     }
     switch (defaultTargetPlatform) {
       case TargetPlatform.android:
@@ -23,6 +20,15 @@ class DefaultFirebaseOptions {
         );
     }
   }
+
+  static const FirebaseOptions web = FirebaseOptions(
+    apiKey: 'AIzaSyCZKASFmGIz6XM5nNPAP6xhRM06XDPGsDE',
+    appId: '1:789106628921:web:renova8c366web',
+    messagingSenderId: '789106628921',
+    projectId: 'renova-8c366',
+    storageBucket: 'renova-8c366.firebasestorage.app',
+    authDomain: 'renova-8c366.firebaseapp.com',
+  );
 
   static const FirebaseOptions android = FirebaseOptions(
     apiKey: 'AIzaSyCZKASFmGIz6XM5nNPAP6xhRM06XDPGsDE',

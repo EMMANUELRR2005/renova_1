@@ -28,7 +28,10 @@ class SeedService {
           .timeout(const Duration(seconds: 10));
 
       if (adminDoc.exists) {
-        print('✅ [Seed] Ya ejecutado anteriormente — omitiendo');
+        print('✅ [Seed] Admin ya existe — verificando catálogos...');
+        // Siempre asegurar que existan servicios y clínicas
+        await _ensureServiciosExisten();
+        await _ensureClinicasExisten();
         await _firebaseAuth.signOut();
         return;
       }
@@ -420,6 +423,28 @@ class SeedService {
     for (final plan in planes) {
       await _db.collection('planes').add(plan.toMap());
       print('  ✓ Plan creado: ${plan.diagnostico}');
+    }
+  }
+
+  /// Verifica y crea servicios si no existen (para seeds parciales anteriores)
+  Future<void> _ensureServiciosExisten() async {
+    final snap = await _db.collection('servicios').limit(1).get();
+    if (snap.docs.isEmpty) {
+      print('🌱 [Seed] Creando servicios faltantes...');
+      await _seedServicios();
+    } else {
+      print('✅ [Seed] Servicios ya existen');
+    }
+  }
+
+  /// Verifica y crea clínicas si no existen (para seeds parciales anteriores)
+  Future<void> _ensureClinicasExisten() async {
+    final snap = await _db.collection('clinicas').limit(1).get();
+    if (snap.docs.isEmpty) {
+      print('🌱 [Seed] Creando clínicas faltantes...');
+      await _seedClinicas();
+    } else {
+      print('✅ [Seed] Clínicas ya existen');
     }
   }
 }

@@ -17,6 +17,7 @@ import '../../features/expedientes/expediente_screen.dart';
 import '../../features/caja/caja_screen.dart';
 import '../../features/terapeuta/agenda_terapeuta_screen.dart';
 import '../../features/usuarios/usuarios_screen.dart';
+import '../../features/reportes/reportes_screen.dart';
 
 class GoRouterNotifier extends ChangeNotifier {
   void notifyListenersCustom() {
@@ -96,6 +97,10 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         path: '/usuarios',
         builder: (context, state) => const UsuariosScreen(),
       ),
+      GoRoute(
+        path: '/reportes',
+        builder: (context, state) => const ReportesScreen(),
+      ),
     ],
     redirect: (context, state) {
       final path = state.uri.path;
@@ -107,19 +112,29 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         if (path == '/agenda-terapeuta' && rol != RolUsuario.terapeuta) {
           return _getRutaInicial(rol);
         }
-        if ((path == '/caja' || path == '/usuarios' || path == '/dashboard') &&
+        // Caja solo para secretaria
+        if (path == '/caja' && rol != RolUsuario.secretaria_recepcion) {
+          return _getRutaInicial(rol);
+        }
+        // Reportes solo para administradora
+        if (path == '/reportes' && rol != RolUsuario.administradora) {
+          return _getRutaInicial(rol);
+        }
+        // Dashboard y Usuarios solo para administradora
+        if ((path == '/usuarios' || path == '/dashboard') &&
             rol != RolUsuario.administradora) {
           return _getRutaInicial(rol);
         }
+        // Expedientes para enfermera y doctora
         if (path == '/expedientes' &&
-            rol != RolUsuario.administradora &&
-            rol != RolUsuario.enfermera) {
+            rol != RolUsuario.enfermera &&
+            rol != RolUsuario.doctora) {
           return _getRutaInicial(rol);
         }
+        // Citas para secretaria y doctora
         if (path == '/citas' &&
-            rol != RolUsuario.administradora &&
-            rol != RolUsuario.enfermera &&
-            rol != RolUsuario.secretaria_recepcion) {
+            rol != RolUsuario.secretaria_recepcion &&
+            rol != RolUsuario.doctora) {
           return _getRutaInicial(rol);
         }
         // Solo secretaria puede acceder a nuevo/editar
