@@ -125,6 +125,23 @@ class PacienteService {
       'inactivadoPor': enfermeraUid,
       'nombreInactivador': nombreEnfermera,
     });
+
+    // Guardar en historial del paciente
+    await _db
+        .collection('pacientes')
+        .doc(pacienteId)
+        .collection('historial')
+        .add({
+      'tipo': 'servicio_realizado',
+      'fecha': FieldValue.serverTimestamp(),
+      'servicio': servicioRealizado,
+      'servicioId': servicioRealizadoId,
+      'registradoPor': enfermeraUid,
+      'nombreEnfermera': nombreEnfermera,
+      'nota': 'Paciente marcado como inactivo',
+      'creadoPor': enfermeraUid,
+      'rol_creador': 'enfermera',
+    });
   }
 
   Future<void> reactivarPaciente({

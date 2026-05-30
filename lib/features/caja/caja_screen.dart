@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -9,6 +10,7 @@ import '../../data/mock/providers.dart';
 import '../../data/services/venta_service.dart';
 import '../../data/services/catalogo_service.dart';
 import '../../data/services/paciente_service.dart';
+import '../../data/services/email_service.dart';
 import '../../data/mock/mock_data.dart';
 import '../../features/auth/providers/auth_provider.dart';
 import 'factura_pdf.dart';
@@ -288,6 +290,21 @@ class _CajaScreenState extends ConsumerState<CajaScreen> {
                   onPressed: () => FacturaPDF.generarYMostrar(venta: venta),
                 ),
                 IconButton(
+                  icon: Icon(
+                    Icons.email_outlined,
+                    size: 18,
+                    color: venta.emailPaciente.isNotEmpty
+                        ? const Color(0xFFC9A96E)
+                        : AppColors.textSecondary.withValues(alpha: 0.5),
+                  ),
+                  tooltip: venta.emailPaciente.isNotEmpty
+                      ? 'Enviar Factura por Email'
+                      : 'Sin email registrado',
+                  onPressed: venta.emailPaciente.isNotEmpty
+                      ? () => _enviarFacturaPorEmail(venta)
+                      : null,
+                ),
+                IconButton(
                   icon: const Icon(Icons.cancel, size: 18, color: AppColors.danger),
                   tooltip: 'Anular',
                   onPressed: () => _mostrarDialogAnular(venta),
@@ -451,6 +468,66 @@ class _CajaScreenState extends ConsumerState<CajaScreen> {
         },
       ),
     );
+  }
+
+  Future<void> _enviarFacturaPorEmail(Venta venta) async {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const AlertDialog(
+        content: Row(
+          children: [
+            CircularProgressIndicator(),
+            SizedBox(width: 16),
+            Text('Enviando factura...'),
+          ],
+        ),
+      ),
+    );
+
+    try {
+      final pdfBytes = await FacturaPDF.generarBytes(venta: venta);
+
+      final enviado = await EmailService.enviarFactura(
+        emailDestino: venta.emailPaciente,
+        nombrePaciente: venta.nombrePaciente,
+        numeroFactura: venta.numeroCorrelativo.replaceAll('VTA', 'FAC'),
+        pdfBytes: pdfBytes,
+      );
+
+      if (mounted) Navigator.of(context).pop();
+
+      if (enviado) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Factura enviada a ${venta.emailPaciente}'),
+              backgroundColor: AppColors.success,
+              duration: const Duration(seconds: 4),
+            ),
+          );
+        }
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('No se pudo enviar la factura. Verifique la configuración de email.'),
+              backgroundColor: AppColors.warning,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) Navigator.of(context).pop();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error al enviar: $e'),
+            backgroundColor: AppColors.danger,
+          ),
+        );
+      }
+    }
   }
 }
 
@@ -1250,6 +1327,7 @@ class _NuevoCobroDialogState extends ConsumerState<_NuevoCobroDialog> {
         pacienteId: _pacienteSeleccionado!.id,
         nombrePaciente: _pacienteSeleccionado!.nombreCompleto,
         telefonoPaciente: _pacienteSeleccionado!.telefono,
+        emailPaciente: _pacienteSeleccionado!.email,
         nitCliente: _nitController.text.trim().isEmpty ? 'CF' : _nitController.text.trim(),
         items: _items,
         servicio: _items.first.servicio,
@@ -1270,7 +1348,14 @@ class _NuevoCobroDialogState extends ConsumerState<_NuevoCobroDialog> {
         numeroCorrelativo: correlativo,
       );
 
-      await VentaService().crearVenta(venta);
+      final ventaId = await VentaService().crearVenta(venta);
+
+      // Guardar en historial del paciente
+      await _guardarEnHistorialPaciente(
+        ventaId: ventaId,
+        correlativo: correlativo,
+        usuario: usuario,
+      );
 
       if (mounted) {
         Navigator.of(context).pop();
@@ -1293,6 +1378,39 @@ class _NuevoCobroDialogState extends ConsumerState<_NuevoCobroDialog> {
         );
       }
     }
+  }
+
+  Future<void> _guardarEnHistorialPaciente({
+    required String ventaId,
+    required String correlativo,
+    required usuario,
+  }) async {
+    final pacienteId = _pacienteSeleccionado!.id;
+
+    await FirebaseFirestore.instance
+        .collection('pacientes')
+        .doc(pacienteId)
+        .collection('historial')
+        .add({
+      'tipo': 'servicio_cobrado',
+      'fecha': FieldValue.serverTimestamp(),
+      'items': _items
+          .map((item) => {
+                'servicio': item.servicio,
+                'servicioId': item.servicioId,
+                'descripcion': item.descripcion,
+                'monto': item.monto,
+                'clinica': item.clinica,
+              })
+          .toList(),
+      'montoTotal': _total,
+      'metodoPago': _metodoPago,
+      'numeroVenta': correlativo,
+      'ventaId': ventaId,
+      'registradoPor': usuario?.id ?? '',
+      'nombreSecretaria': usuario?.nombre ?? '',
+      'clinica': _clinicaNombre ?? '',
+    });
   }
 }
 

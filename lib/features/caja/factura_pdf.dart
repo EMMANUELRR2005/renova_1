@@ -10,6 +10,26 @@ class FacturaPDF {
     required Venta venta,
     Map<String, dynamic>? configuracion,
   }) async {
+    final pdf = await _generarDocumento(venta, configuracion);
+
+    await Printing.layoutPdf(
+      onLayout: (format) async => pdf.save(),
+      name: 'Factura_${venta.numeroCorrelativo.replaceAll('VTA', 'FAC')}.pdf',
+    );
+  }
+
+  static Future<List<int>> generarBytes({
+    required Venta venta,
+    Map<String, dynamic>? configuracion,
+  }) async {
+    final pdf = await _generarDocumento(venta, configuracion);
+    return pdf.save();
+  }
+
+  static Future<pw.Document> _generarDocumento(
+    Venta venta,
+    Map<String, dynamic>? configuracion,
+  ) async {
     final config = configuracion ?? {
       'nit': '1234567-8',
       'direccion': 'Ciudad de Guatemala, Guatemala',
@@ -19,7 +39,6 @@ class FacturaPDF {
 
     final pdf = pw.Document();
 
-    // Cargar logo desde assets
     pw.MemoryImage? logoImage;
     try {
       final logoData = await rootBundle.load('assets/images/logo_renova.png');
@@ -407,10 +426,7 @@ class FacturaPDF {
       ),
     );
 
-    await Printing.layoutPdf(
-      onLayout: (format) async => pdf.save(),
-      name: 'Factura_${venta.numeroCorrelativo.replaceAll('VTA', 'FAC')}.pdf',
-    );
+    return pdf;
   }
 
   static List<pw.Widget> _buildFilasServicios(Venta venta, PdfColor colorGris) {

@@ -773,6 +773,18 @@ class HistorialConsulta {
   final String creadoPor;
   final String rolCreador;
   final String? proximaCita;
+  // Campos para servicios cobrados
+  final List<Map<String, dynamic>> itemsCobrados;
+  final double montoTotal;
+  final String metodoPago;
+  final String numeroVenta;
+  final String ventaId;
+  final String nombreSecretaria;
+  final String clinica;
+  // Campos para servicio realizado (enfermera)
+  final String servicioRealizado;
+  final String nombreEnfermera;
+  final String nota;
 
   HistorialConsulta({
     required this.id,
@@ -790,6 +802,16 @@ class HistorialConsulta {
     this.enfermera = '',
     this.enfermeraUid = '',
     this.proximaCita,
+    this.itemsCobrados = const [],
+    this.montoTotal = 0,
+    this.metodoPago = '',
+    this.numeroVenta = '',
+    this.ventaId = '',
+    this.nombreSecretaria = '',
+    this.clinica = '',
+    this.servicioRealizado = '',
+    this.nombreEnfermera = '',
+    this.nota = '',
   });
 
   Map<String, dynamic> toMap() => {
@@ -834,6 +856,21 @@ class HistorialConsulta {
       creadoPor: map['creadoPor'] ?? '',
       rolCreador: map['rol_creador'] ?? '',
       proximaCita: map['proxima_cita'],
+      // Campos para servicios cobrados
+      itemsCobrados: (map['items'] as List?)
+              ?.map((i) => Map<String, dynamic>.from(i as Map))
+              .toList() ??
+          [],
+      montoTotal: (map['montoTotal'] ?? 0).toDouble(),
+      metodoPago: map['metodoPago'] ?? '',
+      numeroVenta: map['numeroVenta'] ?? '',
+      ventaId: map['ventaId'] ?? '',
+      nombreSecretaria: map['nombreSecretaria'] ?? '',
+      clinica: map['clinica'] ?? '',
+      // Campos para servicio realizado (enfermera)
+      servicioRealizado: map['servicio'] ?? '',
+      nombreEnfermera: map['nombreEnfermera'] ?? '',
+      nota: map['nota'] ?? '',
     );
   }
 }

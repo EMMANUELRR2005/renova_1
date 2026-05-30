@@ -44,6 +44,7 @@ class Venta {
   final String pacienteId;
   final String nombrePaciente;
   final String telefonoPaciente;
+  final String emailPaciente;
   final String nitCliente;
   final List<ItemVenta> items;
   final String servicio;
@@ -69,6 +70,7 @@ class Venta {
     required this.pacienteId,
     required this.nombrePaciente,
     required this.telefonoPaciente,
+    this.emailPaciente = '',
     this.nitCliente = 'CF',
     required this.items,
     required this.servicio,
@@ -101,6 +103,7 @@ class Venta {
       pacienteId: map['pacienteId'] ?? '',
       nombrePaciente: map['nombrePaciente'] ?? '',
       telefonoPaciente: map['telefonoPaciente'] ?? '',
+      emailPaciente: map['emailPaciente'] ?? '',
       nitCliente: map['nitCliente'] ?? 'CF',
       items: itemsList,
       servicio: map['servicio'] ?? '',
@@ -130,6 +133,7 @@ class Venta {
       'pacienteId': pacienteId,
       'nombrePaciente': nombrePaciente,
       'telefonoPaciente': telefonoPaciente,
+      'emailPaciente': emailPaciente,
       'nitCliente': nitCliente,
       'items': items.map((i) => i.toMap()).toList(),
       'servicio': servicio,

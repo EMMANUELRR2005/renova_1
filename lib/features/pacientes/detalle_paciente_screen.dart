@@ -410,7 +410,7 @@ class _HistorialCardState extends State<_HistorialCard> {
                     padding: const EdgeInsets.symmetric(
                         horizontal: 8, vertical: 3),
                     decoration: BoxDecoration(
-                      color: color.withOpacity(0.12),
+                      color: color.withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(4),
                     ),
                     child: Text(
@@ -447,38 +447,47 @@ class _HistorialCardState extends State<_HistorialCard> {
           if (_expandido)
             Container(
               padding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Divider(),
-                  if (h.motivo.isNotEmpty) _DetailRow('Motivo', h.motivo),
-                  if (h.diagnostico.isNotEmpty)
-                    _DetailRow('Diagnóstico', h.diagnostico),
-                  if (h.tratamiento.isNotEmpty)
-                    _DetailRow('Tratamiento', h.tratamiento),
-                  if (h.comentarios.isNotEmpty)
-                    _DetailRow('Comentarios', h.comentarios),
-                  if (h.doctora.isNotEmpty) _DetailRow('Doctora', h.doctora),
-                  if (h.medicamentos.isNotEmpty) ...[
-                    const SizedBox(height: 6),
-                    Text('Medicamentos:',
-                        style: const TextStyle(
-                            fontSize: 12, fontWeight: FontWeight.w600)),
-                    const SizedBox(height: 4),
-                    ...h.medicamentos.map((m) => Padding(
-                          padding: const EdgeInsets.only(left: 12, bottom: 2),
-                          child: Text(
-                            '• ${m.nombre} — ${m.dosis} — ${m.frecuencia} — ${m.duracion} días',
-                            style: const TextStyle(fontSize: 12),
-                          ),
-                        )),
-                  ],
-                  if (h.proximaCita != null && h.proximaCita!.isNotEmpty)
-                    _DetailRow('Próxima cita', h.proximaCita!),
-                  _DetailRow('Registrado por',
-                      '${h.rolCreador.replaceAll('_', ' ')} (${h.creadoPor})'),
-                ],
-              ),
+              child: h.tipo == 'servicio_cobrado'
+                  ? _buildServiciosCobradosContent(h)
+                  : h.tipo == 'servicio_realizado'
+                      ? _buildServicioRealizadoContent(h)
+                      : Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Divider(),
+                            if (h.motivo.isNotEmpty)
+                              _DetailRow('Motivo', h.motivo),
+                            if (h.diagnostico.isNotEmpty)
+                              _DetailRow('Diagnóstico', h.diagnostico),
+                            if (h.tratamiento.isNotEmpty)
+                              _DetailRow('Tratamiento', h.tratamiento),
+                            if (h.comentarios.isNotEmpty)
+                              _DetailRow('Comentarios', h.comentarios),
+                            if (h.doctora.isNotEmpty)
+                              _DetailRow('Doctora', h.doctora),
+                            if (h.medicamentos.isNotEmpty) ...[
+                              const SizedBox(height: 6),
+                              const Text('Medicamentos:',
+                                  style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600)),
+                              const SizedBox(height: 4),
+                              ...h.medicamentos.map((m) => Padding(
+                                    padding:
+                                        const EdgeInsets.only(left: 12, bottom: 2),
+                                    child: Text(
+                                      '• ${m.nombre} — ${m.dosis} — ${m.frecuencia} — ${m.duracion} días',
+                                      style: const TextStyle(fontSize: 12),
+                                    ),
+                                  )),
+                            ],
+                            if (h.proximaCita != null &&
+                                h.proximaCita!.isNotEmpty)
+                              _DetailRow('Próxima cita', h.proximaCita!),
+                            _DetailRow('Registrado por',
+                                '${h.rolCreador.replaceAll('_', ' ')} (${h.creadoPor})'),
+                          ],
+                        ),
             ),
         ],
       ),
@@ -493,6 +502,10 @@ class _HistorialCardState extends State<_HistorialCard> {
         return AppColors.clinicalGreen;
       case 'procedimiento':
         return AppColors.warning;
+      case 'servicio_cobrado':
+        return const Color(0xFFC9A96E);
+      case 'servicio_realizado':
+        return AppColors.success;
       default:
         return AppColors.neutral;
     }
@@ -506,16 +519,122 @@ class _HistorialCardState extends State<_HistorialCard> {
         return 'Nota Médica';
       case 'procedimiento':
         return 'Procedimiento';
+      case 'servicio_cobrado':
+        return 'Servicio Cobrado';
+      case 'servicio_realizado':
+        return 'Servicio Realizado';
       default:
         return 'Comentario';
     }
   }
 
   String _preview(HistorialConsulta h) {
+    if (h.tipo == 'servicio_cobrado') {
+      return 'Q ${h.montoTotal.toStringAsFixed(2)} - ${h.numeroVenta}';
+    }
+    if (h.tipo == 'servicio_realizado') {
+      return h.servicioRealizado;
+    }
     if (h.motivo.isNotEmpty) return h.motivo;
     if (h.comentarios.isNotEmpty) return h.comentarios;
     if (h.diagnostico.isNotEmpty) return h.diagnostico;
     return '—';
+  }
+
+  Widget _buildServiciosCobradosContent(HistorialConsulta h) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Divider(),
+        Text(
+          '${h.numeroVenta} · ${_formatMetodoPago(h.metodoPago)}',
+          style: const TextStyle(
+            fontSize: 12,
+            color: AppColors.textSecondary,
+          ),
+        ),
+        const SizedBox(height: 12),
+        ...h.itemsCobrados.map((item) => Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('• ',
+                      style: TextStyle(fontWeight: FontWeight.bold)),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          item['servicio'] ?? '',
+                          style: const TextStyle(fontWeight: FontWeight.w500),
+                        ),
+                        if (item['descripcion'] != null &&
+                            (item['descripcion'] as String).isNotEmpty)
+                          Text(
+                            item['descripcion'],
+                            style: const TextStyle(
+                              color: AppColors.textSecondary,
+                              fontSize: 12,
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                  Text(
+                    'Q ${(item['monto'] as num).toStringAsFixed(2)}',
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                ],
+              ),
+            )),
+        const Divider(),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              'Cobrado por: ${h.nombreSecretaria}',
+              style: const TextStyle(
+                fontSize: 12,
+                color: AppColors.textSecondary,
+              ),
+            ),
+            Text(
+              'Total: Q ${h.montoTotal.toStringAsFixed(2)}',
+              style: const TextStyle(
+                fontWeight: FontWeight.bold,
+                color: AppColors.primary,
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildServicioRealizadoContent(HistorialConsulta h) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Divider(),
+        _DetailRow('Servicio', h.servicioRealizado),
+        if (h.nota.isNotEmpty) _DetailRow('Nota', h.nota),
+        _DetailRow('Registrado por', h.nombreEnfermera),
+      ],
+    );
+  }
+
+  String _formatMetodoPago(String metodo) {
+    switch (metodo) {
+      case 'efectivo':
+        return 'Efectivo';
+      case 'tarjeta':
+        return 'Tarjeta';
+      case 'visa_cuotas':
+        return 'Visa Cuotas';
+      default:
+        return metodo;
+    }
   }
 }
 
