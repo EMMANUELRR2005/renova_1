@@ -229,6 +229,8 @@ class UsuariosScreen extends ConsumerWidget {
         return AppColors.clinicalGreen;
       case RolUsuario.terapeuta:
         return const Color(0xFF00838F);
+      case RolUsuario.farmaceutica:
+        return const Color(0xFF00796B);
     }
   }
 
@@ -244,6 +246,8 @@ class UsuariosScreen extends ConsumerWidget {
         return 'Secretaria';
       case RolUsuario.terapeuta:
         return 'Terapeuta';
+      case RolUsuario.farmaceutica:
+        return 'Farmacéutica';
     }
   }
 }
@@ -273,6 +277,7 @@ class _NuevoUsuarioDialogState extends State<_NuevoUsuarioDialog> {
     (RolUsuario.doctora, 'Doctora'),
     (RolUsuario.enfermera, 'Enfermera'),
     (RolUsuario.secretaria_recepcion, 'Secretaria de Recepción'),
+    (RolUsuario.farmaceutica, 'Farmacéutica'),
   ];
 
   RolUsuario _rolSeleccionado = RolUsuario.enfermera;

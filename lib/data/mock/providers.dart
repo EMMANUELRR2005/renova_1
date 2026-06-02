@@ -1,6 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'mock_data.dart';
+// 'Medicamento' (inventario de farmacia) vive en farmacia_service.dart; aquí
+// ocultamos el 'Medicamento' de receta de mock_data para evitar el choque.
+import 'mock_data.dart' hide Medicamento;
 import '../services/auth_service.dart';
 import '../services/paciente_service.dart';
 import '../services/cita_service.dart';
@@ -10,6 +12,7 @@ import '../services/catalogo_service.dart';
 import '../services/venta_service.dart';
 import '../services/expediente_service.dart';
 import '../services/reporte_service.dart';
+import '../services/farmacia_service.dart';
 import '../../features/auth/providers/auth_provider.dart';
 
 // ============================================================================
@@ -330,4 +333,25 @@ final entradasExpedienteProvider =
 // ============================================================================
 
 final reporteServiceProvider = Provider((ref) => ReporteService());
+
+// ============================================================================
+// FARMACIA (FARMACÉUTICA / ADMINISTRADORA)
+// ============================================================================
+
+final farmaciaServiceProvider = Provider((ref) => FarmaciaService());
+
+/// Stream del inventario de medicamentos en tiempo real.
+final medicamentosStreamProvider = StreamProvider<List<Medicamento>>((ref) {
+  final usuario = ref.watch(usuarioActivoProvider);
+  if (usuario == null) return const Stream.empty();
+  return ref.watch(farmaciaServiceProvider).streamMedicamentos();
+});
+
+/// Stream de movimientos de farmacia (historial).
+final movimientosFarmaciaStreamProvider =
+    StreamProvider<List<MovimientoFarmacia>>((ref) {
+  final usuario = ref.watch(usuarioActivoProvider);
+  if (usuario == null) return const Stream.empty();
+  return ref.watch(farmaciaServiceProvider).streamMovimientos();
+});
 

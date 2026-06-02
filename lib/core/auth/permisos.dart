@@ -78,4 +78,23 @@ class Permisos {
   // Ver citas asignadas (doctora ve solo las suyas)
   static bool puedeVerCitasAsignadas(RolUsuario? rol) =>
       rol == RolUsuario.doctora;
+
+  // ── Farmacia ──────────────────────────────────────────────────────────────
+
+  // Ver inventario de farmacia: administradora y farmaceutica
+  static bool puedeVerFarmacia(RolUsuario? rol) =>
+      rol == RolUsuario.administradora || rol == RolUsuario.farmaceutica;
+
+  // Crear/editar medicamentos: administradora y farmaceutica
+  static bool puedeGestionarMedicamentos(RolUsuario? rol) =>
+      rol == RolUsuario.administradora || rol == RolUsuario.farmaceutica;
+
+  // Eliminar medicamentos: SOLO administradora
+  static bool puedeEliminarMedicamentos(RolUsuario? rol) =>
+      rol == RolUsuario.administradora;
+
+  // Vender medicamentos en caja (descontar inventario): secretaria
+  static bool puedeVenderMedicamentos(RolUsuario? rol) =>
+      rol == RolUsuario.secretaria_recepcion ||
+      rol == RolUsuario.administradora;
 }

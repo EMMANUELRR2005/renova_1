@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 import '../../core/auth/permisos.dart';
 import '../../core/theme/app_theme.dart';
@@ -184,6 +185,32 @@ class _PatientsScreenState extends ConsumerState<PatientsScreen> {
                             ),
                             child: Row(
                               children: [
+                                // Foto del paciente
+                                Container(
+                                  width: 40,
+                                  height: 40,
+                                  margin: const EdgeInsets.only(right: 12),
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    color: Colors.grey[200],
+                                    border: Border.all(
+                                      color: AppColors.primary.withOpacity(0.3),
+                                      width: 1,
+                                    ),
+                                  ),
+                                  child: ClipOval(
+                                    child: (p.fotoUrl != null && p.fotoUrl!.isNotEmpty)
+                                        ? CachedNetworkImage(
+                                            imageUrl: p.fotoUrl!,
+                                            fit: BoxFit.cover,
+                                            placeholder: (context, url) =>
+                                                const Icon(Icons.person, size: 20, color: Colors.grey),
+                                            errorWidget: (context, url, error) =>
+                                                const Icon(Icons.person, size: 20, color: Colors.grey),
+                                          )
+                                        : const Icon(Icons.person, size: 20, color: Colors.grey),
+                                  ),
+                                ),
                                 Expanded(
                                   flex: 3,
                                   child: Column(

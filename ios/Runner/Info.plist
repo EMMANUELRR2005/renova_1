@@ -66,5 +66,9 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<key>NSCameraUsageDescription</key>
+	<string>Clínica Renova necesita acceso a la cámara para tomar foto del paciente</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Clínica Renova necesita acceso a la galería para seleccionar foto del paciente</string>
 </dict>
 </plist>

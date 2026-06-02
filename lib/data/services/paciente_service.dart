@@ -55,6 +55,12 @@ class PacienteService {
         .update(paciente.toUpdateMap(actualizadoPorUid));
   }
 
+  Future<void> actualizarFotoPaciente(String pacienteId, String fotoUrl) async {
+    await _db.collection('pacientes').doc(pacienteId).update({
+      'fotoUrl': fotoUrl,
+    });
+  }
+
   Stream<Paciente?> streamPacienteById(String id) {
     return _db.collection('pacientes').doc(id).snapshots().map(
         (doc) => doc.exists ? Paciente.fromMap(doc.data()!, doc.id) : null);

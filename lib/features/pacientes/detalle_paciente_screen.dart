@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 import '../../core/auth/permisos.dart';
 import '../../core/theme/app_theme.dart';
@@ -67,6 +68,66 @@ class DetallePacienteScreen extends ConsumerWidget {
                       onPressed: () => context.go('/pacientes'),
                     ),
                     const SizedBox(width: 8),
+                    // Foto del paciente (clickeable para ver en grande)
+                    GestureDetector(
+                      onTap: () {
+                        if (paciente.fotoUrl != null && paciente.fotoUrl!.isNotEmpty) {
+                          _verFotoEnGrande(context, paciente.fotoUrl!, paciente.nombreCompleto);
+                        }
+                      },
+                      child: Stack(
+                        children: [
+                          Container(
+                            width: 60,
+                            height: 60,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: AppColors.primary,
+                                width: 2,
+                              ),
+                            ),
+                            child: ClipOval(
+                              child: (paciente.fotoUrl != null && paciente.fotoUrl!.isNotEmpty)
+                                  ? CachedNetworkImage(
+                                      imageUrl: paciente.fotoUrl!,
+                                      fit: BoxFit.cover,
+                                      placeholder: (context, url) =>
+                                          const Center(child: CircularProgressIndicator(strokeWidth: 2)),
+                                      errorWidget: (context, url, error) =>
+                                          const Icon(Icons.person, size: 30, color: Colors.grey),
+                                    )
+                                  : Container(
+                                      color: Colors.grey[200],
+                                      child: const Icon(
+                                        Icons.person,
+                                        size: 30,
+                                        color: Colors.grey,
+                                      ),
+                                    ),
+                            ),
+                          ),
+                          if (paciente.fotoUrl != null && paciente.fotoUrl!.isNotEmpty)
+                            Positioned(
+                              bottom: 0,
+                              right: 0,
+                              child: Container(
+                                padding: const EdgeInsets.all(3),
+                                decoration: const BoxDecoration(
+                                  color: AppColors.primary,
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(
+                                  Icons.zoom_in,
+                                  color: Colors.white,
+                                  size: 12,
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 12),
                     Expanded(
                       child: Text(
                         paciente.nombreCompleto,
@@ -663,6 +724,81 @@ class _DetailRow extends StatelessWidget {
       ),
     );
   }
+}
+
+// ── Visor de foto en grande ─────────────────────────────────────────────────
+
+void _verFotoEnGrande(BuildContext context, String fotoUrl, String nombrePaciente) {
+  showDialog(
+    context: context,
+    barrierDismissible: true,
+    barrierColor: Colors.black87,
+    builder: (context) => Dialog(
+      backgroundColor: Colors.transparent,
+      insetPadding: const EdgeInsets.all(16),
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          // Foto en grande
+          ClipRRect(
+            borderRadius: BorderRadius.circular(16),
+            child: CachedNetworkImage(
+              imageUrl: fotoUrl,
+              fit: BoxFit.contain,
+              width: double.infinity,
+              placeholder: (context, url) => const Center(
+                child: CircularProgressIndicator(color: Colors.white),
+              ),
+              errorWidget: (context, url, error) => const Center(
+                child: Icon(Icons.broken_image, color: Colors.white, size: 60),
+              ),
+            ),
+          ),
+          // Botón cerrar
+          Positioned(
+            top: 8,
+            right: 8,
+            child: GestureDetector(
+              onTap: () => Navigator.of(context).pop(),
+              child: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: const BoxDecoration(
+                  color: Colors.black54,
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.close, color: Colors.white, size: 20),
+              ),
+            ),
+          ),
+          // Nombre del paciente
+          Positioned(
+            bottom: 0,
+            left: 0,
+            right: 0,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: const BoxDecoration(
+                color: Colors.black54,
+                borderRadius: BorderRadius.only(
+                  bottomLeft: Radius.circular(16),
+                  bottomRight: Radius.circular(16),
+                ),
+              ),
+              child: Text(
+                nombrePaciente,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
 }
 
 // ── Dialog para cambio de estado (Enfermera) ────────────────────────────────

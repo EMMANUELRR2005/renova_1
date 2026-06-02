@@ -64,6 +64,9 @@ class Venta {
   final DateTime fechaVenta;
   final String numeroCorrelativo;
   final String? motivoAnulacion;
+  // Cliente: registrado (paciente) o externo; y tipo de venta para reportes.
+  final bool esPacienteRegistrado;
+  final String tipoVenta; // servicio | farmacia | mixta
 
   Venta({
     required this.id,
@@ -90,6 +93,8 @@ class Venta {
     required this.fechaVenta,
     required this.numeroCorrelativo,
     this.motivoAnulacion,
+    this.esPacienteRegistrado = true,
+    this.tipoVenta = 'servicio',
   });
 
   factory Venta.fromMap(Map<String, dynamic> map, String docId) {
@@ -125,6 +130,8 @@ class Venta {
           (map['fechaVenta'] as Timestamp?)?.toDate() ?? DateTime.now(),
       numeroCorrelativo: map['numeroCorrelativo'] ?? '',
       motivoAnulacion: map['motivoAnulacion'],
+      esPacienteRegistrado: map['esPacienteRegistrado'] ?? true,
+      tipoVenta: map['tipoVenta'] ?? 'servicio',
     );
   }
 
@@ -152,6 +159,8 @@ class Venta {
       'nombreSecretaria': nombreSecretaria,
       'fechaVenta': FieldValue.serverTimestamp(),
       'numeroCorrelativo': numeroCorrelativo,
+      'esPacienteRegistrado': esPacienteRegistrado,
+      'tipoVenta': tipoVenta,
       if (motivoAnulacion != null) 'motivoAnulacion': motivoAnulacion,
     };
   }

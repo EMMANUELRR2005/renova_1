@@ -11,7 +11,8 @@ import '../../data/services/venta_service.dart';
 import '../../data/services/catalogo_service.dart';
 import '../../data/services/paciente_service.dart';
 import '../../data/services/email_service.dart';
-import '../../data/mock/mock_data.dart';
+import '../../data/services/farmacia_service.dart';
+import '../../data/mock/mock_data.dart' hide Medicamento;
 import '../../features/auth/providers/auth_provider.dart';
 import 'factura_pdf.dart';
 
@@ -604,9 +605,19 @@ class _NuevoCobroDialogState extends ConsumerState<_NuevoCobroDialog> {
   bool _buscando = false;
   final _nitController = TextEditingController(text: 'CF');
 
+  // Cliente: registrado (paciente) o externo.
+  bool _esPaciente = true;
+  final _nombreClienteController = TextEditingController();
+
   List<ItemVenta> _items = [];
   String? _clinicaId;
   String? _clinicaNombre;
+
+  // Medicamentos del cobro
+  final List<_ItemMed> _itemsMed = [];
+  List<Medicamento> _todosMedicamentos = [];
+  List<Medicamento> _medResultados = [];
+  final _medBuscarCtrl = TextEditingController();
 
   String _metodoPago = 'efectivo';
   final _referenciaController = TextEditingController();
@@ -622,7 +633,11 @@ class _NuevoCobroDialogState extends ConsumerState<_NuevoCobroDialog> {
   final List<TextEditingController> _montoControllers = [];
   final List<TextEditingController> _descControllers = [];
 
-  double get _subtotal => _items.fold(0, (sum, item) => sum + item.monto);
+  double get _subtotalServicios =>
+      _items.fold(0.0, (sum, item) => sum + item.monto);
+  double get _subtotalMedicamentos =>
+      _itemsMed.fold(0.0, (sum, m) => sum + m.subtotal);
+  double get _subtotal => _subtotalServicios + _subtotalMedicamentos;
   double get _subtotalSinIva => _subtotal / 1.12;
   double get _iva => _subtotal - _subtotalSinIva;
   double get _total => _subtotal;
@@ -651,7 +666,9 @@ class _NuevoCobroDialogState extends ConsumerState<_NuevoCobroDialog> {
       c.dispose();
     }
     _nitController.dispose();
+    _nombreClienteController.dispose();
     _referenciaController.dispose();
+    _medBuscarCtrl.dispose();
     super.dispose();
   }
 
@@ -669,10 +686,12 @@ class _NuevoCobroDialogState extends ConsumerState<_NuevoCobroDialog> {
     try {
       final servicios = await CatalogoService().getServicios();
       final clinicas = await CatalogoService().getClinicas();
+      final medicamentos = await FarmaciaService().getMedicamentos();
       if (mounted) {
         setState(() {
           _servicios = servicios;
           _clinicas = clinicas;
+          _todosMedicamentos = medicamentos;
           _cargandoCatalogos = false;
         });
       }
@@ -681,6 +700,75 @@ class _NuevoCobroDialogState extends ConsumerState<_NuevoCobroDialog> {
         setState(() => _cargandoCatalogos = false);
       }
     }
+  }
+
+  // ── Medicamentos en el cobro ────────────────────────────────────────────
+
+  void _buscarMedicamentos(String query) {
+    final q = query.trim().toLowerCase();
+    if (q.isEmpty) {
+      setState(() => _medResultados = []);
+      return;
+    }
+    setState(() {
+      _medResultados = _todosMedicamentos.where((m) {
+        return m.nombre.toLowerCase().contains(q) ||
+            m.nombreGenerico.toLowerCase().contains(q) ||
+            m.codigoBarras.contains(query.trim()) ||
+            m.codigoInterno.toLowerCase().contains(q);
+      }).take(6).toList();
+    });
+  }
+
+  /// Llamado cuando el lector de código de barras envía el código + Enter.
+  void _agregarMedicamentoPorCodigo(String codigo) {
+    final cod = codigo.trim();
+    if (cod.isEmpty) return;
+    Medicamento? med;
+    for (final m in _todosMedicamentos) {
+      if (m.codigoBarras == cod) {
+        med = m;
+        break;
+      }
+    }
+    if (med != null) {
+      _agregarMedicamento(med);
+      _medBuscarCtrl.clear();
+      setState(() => _medResultados = []);
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Código no encontrado: $cod'),
+          backgroundColor: AppColors.warning,
+        ),
+      );
+    }
+  }
+
+  void _agregarMedicamento(Medicamento med) {
+    // Si ya está agregado, incrementa cantidad (respetando stock).
+    final idx = _itemsMed.indexWhere((i) => i.medicamentoId == med.id);
+    setState(() {
+      if (idx >= 0) {
+        if (_itemsMed[idx].cantidad < med.cantidad) {
+          _itemsMed[idx].cantidad++;
+        }
+      } else {
+        _itemsMed.add(_ItemMed(
+          medicamentoId: med.id,
+          nombre: med.nombre,
+          codigoBarras: med.codigoBarras,
+          precioUnitario: med.precioVenta,
+          stockDisponible: med.cantidad,
+        ));
+      }
+      _medBuscarCtrl.clear();
+      _medResultados = [];
+    });
+  }
+
+  void _quitarMedicamento(int index) {
+    setState(() => _itemsMed.removeAt(index));
   }
 
   Future<void> _buscarPacientes(String query) async {
@@ -813,14 +901,49 @@ class _NuevoCobroDialogState extends ConsumerState<_NuevoCobroDialog> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
-          'Seleccionar Paciente',
+          'Cliente',
           style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
         ),
+        const SizedBox(height: 12),
+        // Toggle tipo de cliente
+        Row(
+          children: [
+            ChoiceChip(
+              label: const Text('Paciente registrado'),
+              selected: _esPaciente,
+              onSelected: (_) => setState(() => _esPaciente = true),
+              selectedColor: AppColors.primary,
+              labelStyle: TextStyle(
+                  color: _esPaciente ? Colors.white : AppColors.textPrimary),
+            ),
+            const SizedBox(width: 8),
+            ChoiceChip(
+              label: const Text('Cliente externo'),
+              selected: !_esPaciente,
+              onSelected: (_) => setState(() => _esPaciente = false),
+              selectedColor: AppColors.primary,
+              labelStyle: TextStyle(
+                  color: !_esPaciente ? Colors.white : AppColors.textPrimary),
+            ),
+          ],
+        ),
         const SizedBox(height: 16),
+        if (_esPaciente)
+          _buildBusquedaPaciente()
+        else
+          _buildClienteExterno(),
+      ],
+    );
+  }
+
+  Widget _buildBusquedaPaciente() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
         TextField(
           decoration: const InputDecoration(
             labelText: 'Buscar por nombre o teléfono',
-            prefixIcon: Icon(Icons.search),
+            prefixIcon: Icon(Icons.person_search),
             border: OutlineInputBorder(),
           ),
           onChanged: (v) {
@@ -894,6 +1017,54 @@ class _NuevoCobroDialogState extends ConsumerState<_NuevoCobroDialog> {
     );
   }
 
+  Widget _buildClienteExterno() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        TextField(
+          controller: _nombreClienteController,
+          decoration: const InputDecoration(
+            labelText: 'Nombre del cliente (opcional)',
+            hintText: 'Dejar vacío para venta anónima',
+            prefixIcon: Icon(Icons.person_outline),
+            border: OutlineInputBorder(),
+          ),
+        ),
+        const SizedBox(height: 12),
+        TextField(
+          controller: _nitController,
+          decoration: const InputDecoration(
+            labelText: 'NIT (opcional)',
+            hintText: 'CF si no tiene',
+            prefixIcon: Icon(Icons.receipt_outlined),
+            border: OutlineInputBorder(),
+          ),
+        ),
+        const SizedBox(height: 12),
+        Container(
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            color: AppColors.primary.withValues(alpha: 0.06),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: AppColors.primary.withValues(alpha: 0.2)),
+          ),
+          child: const Row(
+            children: [
+              Icon(Icons.info_outline, color: AppColors.primary, size: 16),
+              SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Puedes vender sin registrar datos del cliente. La venta quedará como anónima ("Cliente Externo").',
+                  style: TextStyle(fontSize: 12, color: AppColors.primary),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildPaso2Servicios() {
     if (_cargandoCatalogos) {
       return const Center(child: CircularProgressIndicator());
@@ -959,6 +1130,10 @@ class _NuevoCobroDialogState extends ConsumerState<_NuevoCobroDialog> {
             ),
           ),
         ),
+
+        const Divider(thickness: 1, height: 32),
+
+        _buildSeccionMedicamentos(),
 
         const Divider(thickness: 1, height: 32),
 
@@ -1061,6 +1236,141 @@ class _NuevoCobroDialogState extends ConsumerState<_NuevoCobroDialog> {
               onChanged: (value) {
                 _items[index].descripcion = value;
               },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSeccionMedicamentos() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            const Icon(Icons.medication, size: 18, color: AppColors.primary),
+            const SizedBox(width: 8),
+            const Text(
+              'Medicamentos (opcional)',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+            ),
+            const Spacer(),
+            if (_itemsMed.isNotEmpty)
+              Text(
+                '${_itemsMed.length} medicamento${_itemsMed.length > 1 ? 's' : ''}',
+                style: const TextStyle(color: AppColors.textSecondary),
+              ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        // Buscador con soporte de código de barras
+        TextFormField(
+          controller: _medBuscarCtrl,
+          decoration: const InputDecoration(
+            hintText: 'Buscar medicamento o escanear código...',
+            prefixIcon: Icon(Icons.search),
+            suffixIcon: Icon(Icons.barcode_reader),
+            border: OutlineInputBorder(),
+            isDense: true,
+          ),
+          onChanged: _buscarMedicamentos,
+          onFieldSubmitted: _agregarMedicamentoPorCodigo,
+        ),
+        // Resultados de búsqueda
+        if (_medResultados.isNotEmpty)
+          Container(
+            margin: const EdgeInsets.only(top: 8),
+            decoration: BoxDecoration(
+              border: Border.all(color: AppColors.border),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Column(
+              children: _medResultados.map((med) {
+                final agotado = med.cantidad <= 0;
+                return ListTile(
+                  dense: true,
+                  leading: const Icon(Icons.medication_outlined,
+                      color: AppColors.primary),
+                  title: Text(med.nombre),
+                  subtitle: Text(
+                    'Estante: ${med.estante} · Stock: ${med.cantidad} · Q ${med.precioVenta.toStringAsFixed(2)}',
+                    style: const TextStyle(fontSize: 11),
+                  ),
+                  trailing: agotado
+                      ? const Text('Agotado',
+                          style: TextStyle(
+                              color: AppColors.danger,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600))
+                      : IconButton(
+                          icon: const Icon(Icons.add_circle,
+                              color: AppColors.primary),
+                          onPressed: () => _agregarMedicamento(med),
+                        ),
+                );
+              }).toList(),
+            ),
+          ),
+        // Medicamentos agregados
+        ..._itemsMed.asMap().entries.map((e) => _buildItemMedCard(e.key, e.value)),
+      ],
+    );
+  }
+
+  Widget _buildItemMedCard(int index, _ItemMed item) {
+    return Card(
+      margin: const EdgeInsets.only(top: 8),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        child: Row(
+          children: [
+            const Icon(Icons.medication, size: 18, color: AppColors.primary),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(item.nombre,
+                      style: const TextStyle(
+                          fontSize: 13, fontWeight: FontWeight.w600)),
+                  Text('Q ${item.precioUnitario.toStringAsFixed(2)} c/u · stock ${item.stockDisponible}',
+                      style: const TextStyle(
+                          fontSize: 11, color: AppColors.textSecondary)),
+                ],
+              ),
+            ),
+            // Stepper de cantidad
+            IconButton(
+              visualDensity: VisualDensity.compact,
+              icon: const Icon(Icons.remove_circle_outline, size: 20),
+              onPressed: item.cantidad > 1
+                  ? () => setState(() => item.cantidad--)
+                  : null,
+            ),
+            Text('${item.cantidad}',
+                style: const TextStyle(fontWeight: FontWeight.w600)),
+            IconButton(
+              visualDensity: VisualDensity.compact,
+              icon: const Icon(Icons.add_circle_outline, size: 20),
+              onPressed: item.cantidad < item.stockDisponible
+                  ? () => setState(() => item.cantidad++)
+                  : null,
+            ),
+            const SizedBox(width: 8),
+            SizedBox(
+              width: 72,
+              child: Text(
+                'Q ${item.subtotal.toStringAsFixed(2)}',
+                textAlign: TextAlign.right,
+                style: const TextStyle(fontWeight: FontWeight.w700),
+              ),
+            ),
+            IconButton(
+              visualDensity: VisualDensity.compact,
+              icon: const Icon(Icons.delete_outline,
+                  size: 20, color: AppColors.danger),
+              onPressed: () => _quitarMedicamento(index),
             ),
           ],
         ),
@@ -1210,7 +1520,14 @@ class _NuevoCobroDialogState extends ConsumerState<_NuevoCobroDialog> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _ConfirmRow('Paciente', _pacienteSeleccionado?.nombreCompleto ?? ''),
+              _ConfirmRow(
+                _esPaciente ? 'Paciente' : 'Cliente',
+                _esPaciente
+                    ? (_pacienteSeleccionado?.nombreCompleto ?? '')
+                    : (_nombreClienteController.text.trim().isEmpty
+                        ? 'Cliente Externo'
+                        : _nombreClienteController.text.trim()),
+              ),
               _ConfirmRow('NIT', _nitController.text.isEmpty ? 'CF' : _nitController.text),
               _ConfirmRow('Clínica', _clinicaNombre ?? ''),
               const Divider(),
@@ -1219,20 +1536,47 @@ class _NuevoCobroDialogState extends ConsumerState<_NuevoCobroDialog> {
                 style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
               ),
               const SizedBox(height: 8),
-              ..._items.map((item) => Padding(
-                    padding: const EdgeInsets.only(left: 8, bottom: 4),
-                    child: Row(
-                      children: [
-                        const Icon(Icons.check, size: 16, color: AppColors.success),
-                        const SizedBox(width: 8),
-                        Expanded(child: Text(item.servicio)),
-                        Text(
-                          'Q ${item.monto.toStringAsFixed(2)}',
-                          style: const TextStyle(fontWeight: FontWeight.w600),
+              ..._items
+                  .where((item) => item.servicioId.isNotEmpty && item.monto > 0)
+                  .map((item) => Padding(
+                        padding: const EdgeInsets.only(left: 8, bottom: 4),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.check,
+                                size: 16, color: AppColors.success),
+                            const SizedBox(width: 8),
+                            Expanded(child: Text(item.servicio)),
+                            Text(
+                              'Q ${item.monto.toStringAsFixed(2)}',
+                              style:
+                                  const TextStyle(fontWeight: FontWeight.w600),
+                            ),
+                          ],
                         ),
-                      ],
-                    ),
-                  )),
+                      )),
+              if (_itemsMed.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                const Text(
+                  'Medicamentos:',
+                  style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                ),
+                const SizedBox(height: 8),
+                ..._itemsMed.map((m) => Padding(
+                      padding: const EdgeInsets.only(left: 8, bottom: 4),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.medication,
+                              size: 16, color: AppColors.primary),
+                          const SizedBox(width: 8),
+                          Expanded(child: Text('${m.nombre} (x${m.cantidad})')),
+                          Text(
+                            'Q ${m.subtotal.toStringAsFixed(2)}',
+                            style: const TextStyle(fontWeight: FontWeight.w600),
+                          ),
+                        ],
+                      ),
+                    )),
+              ],
               const Divider(),
               _ConfirmRow('Subtotal', 'Q ${_subtotalSinIva.toStringAsFixed(2)}'),
               _ConfirmRow('IVA (12%)', 'Q ${_iva.toStringAsFixed(2)}'),
@@ -1298,11 +1642,20 @@ class _NuevoCobroDialogState extends ConsumerState<_NuevoCobroDialog> {
   bool _puedeAvanzar() {
     switch (_paso) {
       case 1:
-        return _pacienteSeleccionado != null;
+        // Cliente externo siempre puede avanzar (datos opcionales);
+        // paciente registrado requiere selección.
+        return !_esPaciente || _pacienteSeleccionado != null;
       case 2:
-        return _clinicaId != null &&
-            _items.isNotEmpty &&
-            _items.every((item) => item.servicioId.isNotEmpty && item.monto > 0);
+        if (_clinicaId == null) return false;
+        // Una fila de servicio "parcial" (servicio sin monto o viceversa) bloquea.
+        final hayParcial = _items.any(
+            (i) => (i.servicioId.isNotEmpty) != (i.monto > 0));
+        if (hayParcial) return false;
+        final serviciosValidos = _items
+            .where((i) => i.servicioId.isNotEmpty && i.monto > 0)
+            .toList();
+        // Debe haber al menos un servicio válido o un medicamento.
+        return serviciosValidos.isNotEmpty || _itemsMed.isNotEmpty;
       case 3:
         return true;
       default:
@@ -1315,26 +1668,90 @@ class _NuevoCobroDialogState extends ConsumerState<_NuevoCobroDialog> {
 
     try {
       final usuario = ref.read(usuarioActivoProvider);
+      final farmaciaService = FarmaciaService();
+
+      // 1. Validar stock disponible ANTES de cobrar (estado actual del inventario)
+      if (_itemsMed.isNotEmpty) {
+        final actuales = await farmaciaService.getMedicamentos();
+        for (final m in _itemsMed) {
+          Medicamento? actual;
+          for (final x in actuales) {
+            if (x.id == m.medicamentoId) {
+              actual = x;
+              break;
+            }
+          }
+          final disponible = actual?.cantidad ?? 0;
+          if (disponible < m.cantidad) {
+            setState(() => _guardando = false);
+            _mostrarErrorStock(m.nombre, disponible);
+            return;
+          }
+        }
+      }
+
       final correlativo = await VentaService().generarCorrelativo();
 
-      for (var item in _items) {
+      // 2. Construir items combinados (servicios válidos + medicamentos)
+      final serviciosValidos = _items
+          .where((i) => i.servicioId.isNotEmpty && i.monto > 0)
+          .toList();
+      for (var item in serviciosValidos) {
         item.clinicaId = _clinicaId ?? '';
         item.clinica = _clinicaNombre ?? '';
       }
+      final medComoItems = _itemsMed
+          .map((m) => ItemVenta(
+                servicioId: m.medicamentoId,
+                servicio: '${m.nombre} (x${m.cantidad})',
+                clinicaId: _clinicaId ?? '',
+                clinica: _clinicaNombre ?? '',
+                descripcion: 'Medicamento',
+                monto: m.subtotal,
+              ))
+          .toList();
+      final itemsCombinados = [...serviciosValidos, ...medComoItems];
+
+      // Datos del cliente: paciente registrado o cliente externo.
+      final esPacienteReg = _esPaciente && _pacienteSeleccionado != null;
+      final String pacienteId;
+      final String nombreCliente;
+      final String telefonoCliente;
+      final String emailCliente;
+      if (esPacienteReg) {
+        pacienteId = _pacienteSeleccionado!.id;
+        nombreCliente = _pacienteSeleccionado!.nombreCompleto;
+        telefonoCliente = _pacienteSeleccionado!.telefono;
+        emailCliente = _pacienteSeleccionado!.email;
+      } else {
+        pacienteId = '';
+        nombreCliente = _nombreClienteController.text.trim().isEmpty
+            ? 'Cliente Externo'
+            : _nombreClienteController.text.trim();
+        telefonoCliente = '';
+        emailCliente = '';
+      }
+
+      // Tipo de venta para reportes.
+      final hayServicios = serviciosValidos.isNotEmpty;
+      final hayMeds = _itemsMed.isNotEmpty;
+      final tipoVenta = hayServicios && hayMeds
+          ? 'mixta'
+          : (hayMeds ? 'farmacia' : 'servicio');
 
       final venta = Venta(
         id: '',
-        pacienteId: _pacienteSeleccionado!.id,
-        nombrePaciente: _pacienteSeleccionado!.nombreCompleto,
-        telefonoPaciente: _pacienteSeleccionado!.telefono,
-        emailPaciente: _pacienteSeleccionado!.email,
+        pacienteId: pacienteId,
+        nombrePaciente: nombreCliente,
+        telefonoPaciente: telefonoCliente,
+        emailPaciente: emailCliente,
         nitCliente: _nitController.text.trim().isEmpty ? 'CF' : _nitController.text.trim(),
-        items: _items,
-        servicio: _items.first.servicio,
-        servicioId: _items.first.servicioId,
+        items: itemsCombinados,
+        servicio: itemsCombinados.first.servicio,
+        servicioId: itemsCombinados.first.servicioId,
         clinica: _clinicaNombre ?? '',
         clinicaId: _clinicaId ?? '',
-        descripcion: _items.map((i) => i.descripcion).where((d) => d.isNotEmpty).join(', '),
+        descripcion: itemsCombinados.map((i) => i.descripcion).where((d) => d.isNotEmpty).join(', '),
         subtotalSinIva: _subtotalSinIva,
         iva: _iva,
         monto: _total,
@@ -1346,16 +1763,34 @@ class _NuevoCobroDialogState extends ConsumerState<_NuevoCobroDialog> {
         nombreSecretaria: usuario?.nombre ?? '',
         fechaVenta: DateTime.now(),
         numeroCorrelativo: correlativo,
+        esPacienteRegistrado: esPacienteReg,
+        tipoVenta: tipoVenta,
       );
 
       final ventaId = await VentaService().crearVenta(venta);
 
-      // Guardar en historial del paciente
-      await _guardarEnHistorialPaciente(
-        ventaId: ventaId,
-        correlativo: correlativo,
-        usuario: usuario,
-      );
+      // 3. Descontar medicamentos del inventario (transacción atómica por ítem)
+      for (final m in _itemsMed) {
+        await farmaciaService.descontarPorVenta(
+          medicamentoId: m.medicamentoId,
+          nombreMedicamento: m.nombre,
+          cantidad: m.cantidad,
+          ventaId: ventaId,
+          uid: usuario?.id ?? '',
+          nombreResponsable: usuario?.nombre ?? '',
+        );
+      }
+
+      // 4. Guardar en historial SOLO si es paciente registrado (el cliente
+      //    externo no tiene documento de paciente).
+      if (esPacienteReg) {
+        await _guardarEnHistorialPaciente(
+          ventaId: ventaId,
+          correlativo: correlativo,
+          items: itemsCombinados,
+          usuario: usuario,
+        );
+      }
 
       if (mounted) {
         Navigator.of(context).pop();
@@ -1380,9 +1815,26 @@ class _NuevoCobroDialogState extends ConsumerState<_NuevoCobroDialog> {
     }
   }
 
+  void _mostrarErrorStock(String nombre, int disponible) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+            'Stock insuficiente de $nombre. Disponible: $disponible unidades'),
+        backgroundColor: AppColors.danger,
+        duration: const Duration(seconds: 5),
+        action: SnackBarAction(
+          label: 'Ver inventario',
+          textColor: Colors.white,
+          onPressed: () {},
+        ),
+      ),
+    );
+  }
+
   Future<void> _guardarEnHistorialPaciente({
     required String ventaId,
     required String correlativo,
+    required List<ItemVenta> items,
     required usuario,
   }) async {
     final pacienteId = _pacienteSeleccionado!.id;
@@ -1394,7 +1846,7 @@ class _NuevoCobroDialogState extends ConsumerState<_NuevoCobroDialog> {
         .add({
       'tipo': 'servicio_cobrado',
       'fecha': FieldValue.serverTimestamp(),
-      'items': _items
+      'items': items
           .map((item) => {
                 'servicio': item.servicio,
                 'servicioId': item.servicioId,
@@ -1464,6 +1916,27 @@ class _MetodoPagoCard extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Línea de medicamento dentro de un cobro (para descontar inventario).
+class _ItemMed {
+  final String medicamentoId;
+  final String nombre;
+  final String codigoBarras;
+  final double precioUnitario;
+  final int stockDisponible;
+  int cantidad;
+
+  _ItemMed({
+    required this.medicamentoId,
+    required this.nombre,
+    required this.codigoBarras,
+    required this.precioUnitario,
+    required this.stockDisponible,
+    this.cantidad = 1,
+  });
+
+  double get subtotal => precioUnitario * cantidad;
 }
 
 class _ConfirmRow extends StatelessWidget {

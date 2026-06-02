@@ -1,7 +1,12 @@
+import 'dart:typed_data';
+
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/app_shell.dart';
@@ -20,6 +25,10 @@ class NuevoPacienteScreen extends ConsumerStatefulWidget {
 class _NuevoPacienteScreenState extends ConsumerState<NuevoPacienteScreen> {
   final _formKey = GlobalKey<FormState>();
   bool _guardando = false;
+  bool _subiendoFoto = false;
+
+  // Foto del paciente (cross-platform)
+  Uint8List? _fotoBytes;
 
   // Datos personales
   final _nombreCtrl = TextEditingController();
@@ -85,11 +94,203 @@ class _NuevoPacienteScreenState extends ConsumerState<NuevoPacienteScreen> {
     return edad;
   }
 
+  Future<void> _tomarFoto(ImageSource source) async {
+    try {
+      final picker = ImagePicker();
+      final pickedFile = await picker.pickImage(
+        source: source,
+        maxWidth: 800,
+        maxHeight: 800,
+        imageQuality: 85,
+      );
+
+      if (pickedFile != null) {
+        final bytes = await pickedFile.readAsBytes();
+        setState(() {
+          _fotoBytes = bytes;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error al acceder: $e'),
+            backgroundColor: AppColors.danger,
+          ),
+        );
+      }
+    }
+  }
+
+  void _quitarFoto() {
+    setState(() {
+      _fotoBytes = null;
+    });
+  }
+
+  Future<String?> _subirFoto(String pacienteId) async {
+    if (_fotoBytes == null || _fotoBytes!.isEmpty) {
+      debugPrint('⚠️ No hay bytes de foto para subir');
+      return null;
+    }
+
+    try {
+      setState(() => _subiendoFoto = true);
+      debugPrint('🔵 Iniciando subida a Storage...');
+      debugPrint('🔵 Tamaño: ${_fotoBytes!.length} bytes');
+
+      final storage = FirebaseStorage.instance;
+      debugPrint('🔵 Storage bucket: ${storage.bucket}');
+
+      final ref = storage.ref().child('fotos_pacientes').child('$pacienteId.jpg');
+      debugPrint('🔵 Path completo: ${ref.fullPath}');
+
+      debugPrint('🔵 Ejecutando putData...');
+      final UploadTask uploadTask = ref.putData(
+        _fotoBytes!,
+        SettableMetadata(contentType: 'image/jpeg'),
+      );
+
+      debugPrint('🔵 Esperando que termine la subida...');
+      final TaskSnapshot snapshot = await uploadTask.whenComplete(() {
+        debugPrint('🔵 whenComplete ejecutado');
+      });
+
+      debugPrint('🔵 Estado: ${snapshot.state}');
+      debugPrint('🔵 Bytes transferidos: ${snapshot.bytesTransferred}');
+      debugPrint('🔵 Total bytes: ${snapshot.totalBytes}');
+
+      if (snapshot.state == TaskState.success) {
+        debugPrint('✅ Subida exitosa, obteniendo URL...');
+        final url = await snapshot.ref.getDownloadURL();
+        debugPrint('✅ URL obtenida: $url');
+        return url;
+      } else {
+        debugPrint('❌ Estado final: ${snapshot.state}');
+        return null;
+      }
+    } on FirebaseException catch (e) {
+      debugPrint('❌ FirebaseException: ${e.code} - ${e.message}');
+      debugPrint('❌ Stack: ${e.stackTrace}');
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error Storage: ${e.code}'),
+            backgroundColor: Colors.orange,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
+      return null;
+    } catch (e, stack) {
+      debugPrint('❌ Error desconocido: $e');
+      debugPrint('❌ Stack: $stack');
+      return null;
+    } finally {
+      if (mounted) setState(() => _subiendoFoto = false);
+    }
+  }
+
+  Widget _buildSeccionFoto() {
+    return Column(
+      children: [
+        GestureDetector(
+          onTap: () => _tomarFoto(ImageSource.gallery),
+          child: Container(
+            width: 120,
+            height: 120,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: Colors.grey[200],
+              border: Border.all(
+                color: AppColors.primary,
+                width: 2,
+              ),
+            ),
+            child: _fotoBytes != null
+                ? ClipOval(
+                    child: Image.memory(
+                      _fotoBytes!,
+                      fit: BoxFit.cover,
+                      width: 120,
+                      height: 120,
+                    ),
+                  )
+                : const Icon(
+                    Icons.person,
+                    size: 60,
+                    color: Colors.grey,
+                  ),
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'Foto del Paciente (Opcional)',
+          style: TextStyle(
+            color: AppColors.textSecondary,
+            fontSize: 13,
+            fontFamily: GoogleFonts.dmSans().fontFamily,
+          ),
+        ),
+        const SizedBox(height: 12),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            if (!kIsWeb) ...[
+              OutlinedButton.icon(
+                onPressed: () => _tomarFoto(ImageSource.camera),
+                icon: const Icon(Icons.camera_alt_outlined, size: 18),
+                label: const Text('Cámara'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.primary,
+                  side: const BorderSide(color: AppColors.primary),
+                ),
+              ),
+              const SizedBox(width: 12),
+            ],
+            OutlinedButton.icon(
+              onPressed: () => _tomarFoto(ImageSource.gallery),
+              icon: Icon(
+                kIsWeb ? Icons.upload_file_outlined : Icons.photo_library_outlined,
+                size: 18,
+              ),
+              label: Text(kIsWeb ? 'Subir Foto' : 'Galería'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppColors.primary,
+                side: const BorderSide(color: AppColors.primary),
+              ),
+            ),
+            if (_fotoBytes != null) ...[
+              const SizedBox(width: 12),
+              OutlinedButton.icon(
+                onPressed: _quitarFoto,
+                icon: const Icon(Icons.delete_outline, size: 18),
+                label: const Text('Quitar'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.danger,
+                  side: const BorderSide(color: AppColors.danger),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ],
+    );
+  }
+
   String _formatFecha(DateTime d) =>
       '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
 
   Future<void> _guardar() async {
-    if (!_formKey.currentState!.validate()) return;
+    debugPrint('🔵 Iniciando guardar paciente...');
+    debugPrint('🔵 ¿Tiene foto? ${_fotoBytes != null}');
+    debugPrint('🔵 Tamaño bytes: ${_fotoBytes?.length}');
+
+    if (!_formKey.currentState!.validate()) {
+      debugPrint('❌ Formulario inválido');
+      return;
+    }
     if (_fechaNac == null) {
       _showError('Selecciona la fecha de nacimiento');
       return;
@@ -112,9 +313,28 @@ class _NuevoPacienteScreenState extends ConsumerState<NuevoPacienteScreen> {
       final yaExiste = await service.existeNumeroIdentificacion(_numIdCtrl.text.trim());
       if (yaExiste) {
         _showError('Ya existe un paciente con ese número de identificación');
+        setState(() => _guardando = false);
         return;
       }
 
+      // PASO 1: Subir foto PRIMERO si existe (no bloquea si falla)
+      String? fotoUrl;
+      if (_fotoBytes != null) {
+        debugPrint('🔵 Subiendo foto antes de crear paciente...');
+        final tempId = DateTime.now().millisecondsSinceEpoch.toString();
+        try {
+          fotoUrl = await _subirFoto(tempId);
+          debugPrint('🔵 URL de foto obtenida: $fotoUrl');
+        } catch (e) {
+          debugPrint('⚠️ Error subiendo foto, continuando sin foto: $e');
+          fotoUrl = null;
+        }
+      }
+
+      // PASO 2: Crear paciente con la URL de la foto
+      debugPrint('🔵 Creando paciente en Firestore...');
+      debugPrint('🔵 Servicio: $_servicioNombre (ID: $_servicioId)');
+      debugPrint('🔵 Clínica: $_clinicaNombre (ID: $_clinicaId)');
       final paciente = Paciente(
         id: '',
         nombre: _nombreCtrl.text.trim(),
@@ -141,9 +361,12 @@ class _NuevoPacienteScreenState extends ConsumerState<NuevoPacienteScreen> {
         servicioId: _servicioId,
         clinica: _clinicaNombre,
         clinicaId: _clinicaId,
+        fotoUrl: fotoUrl,
       );
 
       final nuevoId = await service.crearPaciente(paciente);
+      debugPrint('✅ Paciente creado con ID: $nuevoId');
+      debugPrint('✅ fotoUrl guardada: $fotoUrl');
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -156,6 +379,7 @@ class _NuevoPacienteScreenState extends ConsumerState<NuevoPacienteScreen> {
         context.go('/pacientes/detalle');
       }
     } catch (e) {
+      debugPrint('❌ Error guardando paciente: $e');
       _showError('Error al guardar. Intente de nuevo.');
     } finally {
       if (mounted) setState(() => _guardando = false);
@@ -200,6 +424,14 @@ class _NuevoPacienteScreenState extends ConsumerState<NuevoPacienteScreen> {
                 ],
               ),
               const SizedBox(height: 20),
+              // ── Foto del Paciente ───────────────────────────────────────
+              _SectionCard(
+                title: 'Foto del Paciente',
+                children: [
+                  _buildSeccionFoto(),
+                ],
+              ),
+              const SizedBox(height: 16),
               // ── Datos Personales ────────────────────────────────────────
               _SectionCard(
                 title: 'Datos Personales',
@@ -399,19 +631,40 @@ class _NuevoPacienteScreenState extends ConsumerState<NuevoPacienteScreen> {
                   const SizedBox(width: 16),
                   // Botón Guardar Paciente
                   ElevatedButton(
-                    onPressed: _guardando ? null : _guardar,
+                    onPressed: (_guardando || _subiendoFoto) ? null : _guardar,
                     style: ElevatedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(
                           horizontal: 32, vertical: 16),
                     ),
-                    child: _guardando
-                        ? const SizedBox(
-                            height: 20,
-                            width: 20,
-                            child: CircularProgressIndicator(
-                                strokeWidth: 2, color: Colors.white),
+                    child: _subiendoFoto
+                        ? const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(
+                                    strokeWidth: 2, color: Colors.white),
+                              ),
+                              SizedBox(width: 8),
+                              Text('Subiendo foto...'),
+                            ],
                           )
-                        : const Text('Guardar Paciente'),
+                        : _guardando
+                            ? const Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  SizedBox(
+                                    width: 16,
+                                    height: 16,
+                                    child: CircularProgressIndicator(
+                                        strokeWidth: 2, color: Colors.white),
+                                  ),
+                                  SizedBox(width: 8),
+                                  Text('Guardando...'),
+                                ],
+                              )
+                            : const Text('Guardar Paciente'),
                   ),
                 ],
               ),

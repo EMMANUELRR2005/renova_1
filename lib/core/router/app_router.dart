@@ -18,6 +18,8 @@ import '../../features/caja/caja_screen.dart';
 import '../../features/terapeuta/agenda_terapeuta_screen.dart';
 import '../../features/usuarios/usuarios_screen.dart';
 import '../../features/reportes/reportes_screen.dart';
+import '../../features/farmacia/farmacia_screen.dart';
+import '../../features/farmacia/movimientos_farmacia_screen.dart';
 
 class GoRouterNotifier extends ChangeNotifier {
   void notifyListenersCustom() {
@@ -101,6 +103,15 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         path: '/reportes',
         builder: (context, state) => const ReportesScreen(),
       ),
+      // ── Farmacia ──────────────────────────────────────────────────────────
+      GoRoute(
+        path: '/farmacia',
+        builder: (context, state) => const FarmaciaScreen(),
+      ),
+      GoRoute(
+        path: '/farmacia/movimientos',
+        builder: (context, state) => const MovimientosFarmaciaScreen(),
+      ),
     ],
     redirect: (context, state) {
       final path = state.uri.path;
@@ -118,6 +129,12 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         }
         // Reportes solo para administradora
         if (path == '/reportes' && rol != RolUsuario.administradora) {
+          return _getRutaInicial(rol);
+        }
+        // Farmacia solo para administradora y farmaceutica
+        if (path.startsWith('/farmacia') &&
+            rol != RolUsuario.administradora &&
+            rol != RolUsuario.farmaceutica) {
           return _getRutaInicial(rol);
         }
         // Dashboard y Usuarios solo para administradora
@@ -174,6 +191,8 @@ String _getRutaInicial(RolUsuario? rol) {
       return '/pacientes';
     case RolUsuario.terapeuta:
       return '/agenda-terapeuta';
+    case RolUsuario.farmaceutica:
+      return '/farmacia';
     case null:
       return '/login';
   }

@@ -138,6 +138,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         return '/pacientes';
       case RolUsuario.terapeuta:
         return '/agenda-terapeuta';
+      case RolUsuario.farmaceutica:
+        return '/farmacia';
     }
   }
 

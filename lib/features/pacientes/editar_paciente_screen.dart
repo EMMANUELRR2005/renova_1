@@ -1,7 +1,13 @@
+import 'dart:typed_data';
+
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/app_shell.dart';
@@ -21,6 +27,11 @@ class _EditarPacienteScreenState extends ConsumerState<EditarPacienteScreen> {
   final _formKey = GlobalKey<FormState>();
   bool _cargado = false;
   bool _guardando = false;
+  bool _subiendoFoto = false;
+
+  // Foto del paciente (cross-platform)
+  Uint8List? _fotoBytes;
+  String? _fotoUrlExistente;
 
   final _nombreCtrl = TextEditingController();
   final _apellidoCtrl = TextEditingController();
@@ -62,6 +73,7 @@ class _EditarPacienteScreenState extends ConsumerState<EditarPacienteScreen> {
     _contactoRelacion = p.contactoEmergencia.relacion.isEmpty
         ? 'familiar'
         : p.contactoEmergencia.relacion;
+    _fotoUrlExistente = p.fotoUrl;
     if (p.fechaNacimiento.isNotEmpty) {
       final parts = p.fechaNacimiento.split('-');
       if (parts.length == 3) {
@@ -71,6 +83,203 @@ class _EditarPacienteScreenState extends ConsumerState<EditarPacienteScreen> {
       }
     }
     _cargado = true;
+  }
+
+  Future<void> _tomarFoto(ImageSource source) async {
+    try {
+      final picker = ImagePicker();
+      final pickedFile = await picker.pickImage(
+        source: source,
+        maxWidth: 800,
+        maxHeight: 800,
+        imageQuality: 85,
+      );
+
+      if (pickedFile != null) {
+        final bytes = await pickedFile.readAsBytes();
+        setState(() {
+          _fotoBytes = bytes;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error al acceder: $e'),
+            backgroundColor: AppColors.danger,
+          ),
+        );
+      }
+    }
+  }
+
+  void _quitarFoto() {
+    setState(() {
+      _fotoBytes = null;
+      _fotoUrlExistente = null;
+    });
+  }
+
+  Future<String?> _subirFoto(String pacienteId) async {
+    if (_fotoBytes == null || _fotoBytes!.isEmpty) {
+      debugPrint('⚠️ No hay bytes de foto para subir');
+      return null;
+    }
+
+    try {
+      setState(() => _subiendoFoto = true);
+      debugPrint('🔵 Iniciando subida a Storage...');
+      debugPrint('🔵 Tamaño: ${_fotoBytes!.length} bytes');
+
+      final storage = FirebaseStorage.instance;
+      debugPrint('🔵 Storage bucket: ${storage.bucket}');
+
+      final ref = storage.ref().child('fotos_pacientes').child('$pacienteId.jpg');
+      debugPrint('🔵 Path completo: ${ref.fullPath}');
+
+      debugPrint('🔵 Ejecutando putData...');
+      final UploadTask uploadTask = ref.putData(
+        _fotoBytes!,
+        SettableMetadata(contentType: 'image/jpeg'),
+      );
+
+      debugPrint('🔵 Esperando que termine la subida...');
+      final TaskSnapshot snapshot = await uploadTask.whenComplete(() {
+        debugPrint('🔵 whenComplete ejecutado');
+      });
+
+      debugPrint('🔵 Estado: ${snapshot.state}');
+      debugPrint('🔵 Bytes transferidos: ${snapshot.bytesTransferred}');
+      debugPrint('🔵 Total bytes: ${snapshot.totalBytes}');
+
+      if (snapshot.state == TaskState.success) {
+        debugPrint('✅ Subida exitosa, obteniendo URL...');
+        final url = await snapshot.ref.getDownloadURL();
+        debugPrint('✅ URL obtenida: $url');
+        return url;
+      } else {
+        debugPrint('❌ Estado final: ${snapshot.state}');
+        return null;
+      }
+    } on FirebaseException catch (e) {
+      debugPrint('❌ FirebaseException: ${e.code} - ${e.message}');
+      debugPrint('❌ Stack: ${e.stackTrace}');
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error Storage: ${e.code}'),
+            backgroundColor: Colors.orange,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
+      return null;
+    } catch (e, stack) {
+      debugPrint('❌ Error desconocido: $e');
+      debugPrint('❌ Stack: $stack');
+      return null;
+    } finally {
+      if (mounted) setState(() => _subiendoFoto = false);
+    }
+  }
+
+  Widget _buildSeccionFoto() {
+    return Column(
+      children: [
+        GestureDetector(
+          onTap: () => _tomarFoto(ImageSource.gallery),
+          child: Container(
+            width: 120,
+            height: 120,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: Colors.grey[200],
+              border: Border.all(
+                color: AppColors.primary,
+                width: 2,
+              ),
+            ),
+            child: ClipOval(
+              child: _fotoBytes != null
+                  ? Image.memory(
+                      _fotoBytes!,
+                      fit: BoxFit.cover,
+                      width: 120,
+                      height: 120,
+                    )
+                  : (_fotoUrlExistente != null && _fotoUrlExistente!.isNotEmpty)
+                      ? CachedNetworkImage(
+                          imageUrl: _fotoUrlExistente!,
+                          fit: BoxFit.cover,
+                          width: 120,
+                          height: 120,
+                          placeholder: (context, url) =>
+                              const Center(child: CircularProgressIndicator(strokeWidth: 2)),
+                          errorWidget: (context, url, error) =>
+                              const Icon(Icons.person, size: 60, color: Colors.grey),
+                        )
+                      : const Icon(
+                          Icons.person,
+                          size: 60,
+                          color: Colors.grey,
+                        ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'Foto del Paciente (Opcional)',
+          style: TextStyle(
+            color: AppColors.textSecondary,
+            fontSize: 13,
+            fontFamily: GoogleFonts.dmSans().fontFamily,
+          ),
+        ),
+        const SizedBox(height: 12),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            if (!kIsWeb) ...[
+              OutlinedButton.icon(
+                onPressed: () => _tomarFoto(ImageSource.camera),
+                icon: const Icon(Icons.camera_alt_outlined, size: 18),
+                label: const Text('Cámara'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.primary,
+                  side: const BorderSide(color: AppColors.primary),
+                ),
+              ),
+              const SizedBox(width: 12),
+            ],
+            OutlinedButton.icon(
+              onPressed: () => _tomarFoto(ImageSource.gallery),
+              icon: Icon(
+                kIsWeb ? Icons.upload_file_outlined : Icons.photo_library_outlined,
+                size: 18,
+              ),
+              label: Text(kIsWeb ? 'Subir Foto' : 'Galería'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppColors.primary,
+                side: const BorderSide(color: AppColors.primary),
+              ),
+            ),
+            if (_fotoBytes != null || (_fotoUrlExistente != null && _fotoUrlExistente!.isNotEmpty)) ...[
+              const SizedBox(width: 12),
+              OutlinedButton.icon(
+                onPressed: _quitarFoto,
+                icon: const Icon(Icons.delete_outline, size: 18),
+                label: const Text('Quitar'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.danger,
+                  side: const BorderSide(color: AppColors.danger),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ],
+    );
   }
 
   @override
@@ -148,6 +357,17 @@ class _EditarPacienteScreenState extends ConsumerState<EditarPacienteScreen> {
       );
 
       await service.actualizarPaciente(id, actualizado, usuario?.id ?? '');
+
+      // Subir nueva foto si se seleccionó una
+      if (_fotoBytes != null) {
+        final fotoUrl = await _subirFoto(id);
+        if (fotoUrl != null) {
+          await service.actualizarFotoPaciente(id, fotoUrl);
+        }
+      } else if (_fotoUrlExistente == null && _pacienteOriginal.fotoUrl != null) {
+        // Se quitó la foto
+        await service.actualizarFotoPaciente(id, '');
+      }
 
       if (mounted) {
         _showMsg('Datos actualizados correctamente');
@@ -231,6 +451,14 @@ class _EditarPacienteScreenState extends ConsumerState<EditarPacienteScreen> {
                         fontFamily: GoogleFonts.dmSans().fontFamily,
                       ),
                     ),
+                  ),
+                  const SizedBox(height: 16),
+                  // ── Foto del Paciente ───────────────────────────────────────
+                  _SectionCard(
+                    title: 'Foto del Paciente',
+                    children: [
+                      _buildSeccionFoto(),
+                    ],
                   ),
                   const SizedBox(height: 16),
                   _SectionCard(
@@ -355,13 +583,34 @@ class _EditarPacienteScreenState extends ConsumerState<EditarPacienteScreen> {
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton(
-                      onPressed: _guardando ? null : _guardar,
-                      child: _guardando
-                          ? const SizedBox(
-                              height: 20, width: 20,
-                              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                      onPressed: (_guardando || _subiendoFoto) ? null : _guardar,
+                      child: _subiendoFoto
+                          ? const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                ),
+                                SizedBox(width: 8),
+                                Text('Subiendo foto...'),
+                              ],
                             )
-                          : const Text('Guardar Cambios'),
+                          : _guardando
+                              ? const Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    SizedBox(
+                                      width: 16,
+                                      height: 16,
+                                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                    ),
+                                    SizedBox(width: 8),
+                                    Text('Guardando...'),
+                                  ],
+                                )
+                              : const Text('Guardar Cambios'),
                     ),
                   ),
                 ],

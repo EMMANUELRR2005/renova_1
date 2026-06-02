@@ -217,6 +217,42 @@ class AppShell extends ConsumerWidget {
             context.go('/reportes');
           },
         ),
+        SidebarItem(
+          icon: '💊',
+          label: 'Farmacia',
+          isActive: selectedIndex == 3,
+          onTap: () {
+            onNavigate(3);
+            context.go('/farmacia');
+          },
+        ),
+        const Padding(
+          padding: EdgeInsets.symmetric(vertical: 8),
+          child: Divider(color: Color(0xFF1A3F5C)),
+        ),
+      ]);
+    }
+    // FARMACÉUTICA: Inventario, Movimientos
+    else if (rol == RolUsuario.farmaceutica) {
+      items.addAll([
+        SidebarItem(
+          icon: '💊',
+          label: 'Inventario',
+          isActive: selectedIndex == 0,
+          onTap: () {
+            onNavigate(0);
+            context.go('/farmacia');
+          },
+        ),
+        SidebarItem(
+          icon: '📦',
+          label: 'Movimientos',
+          isActive: selectedIndex == 1,
+          onTap: () {
+            onNavigate(1);
+            context.go('/farmacia/movimientos');
+          },
+        ),
         const Padding(
           padding: EdgeInsets.symmetric(vertical: 8),
           child: Divider(color: Color(0xFF1A3F5C)),
@@ -368,6 +404,8 @@ class AppShell extends ConsumerWidget {
         return 'Secretaria';
       case RolUsuario.doctora:
         return 'Doctora';
+      case RolUsuario.farmaceutica:
+        return 'Farmacéutica';
       case null:
         return 'Sin rol';
     }

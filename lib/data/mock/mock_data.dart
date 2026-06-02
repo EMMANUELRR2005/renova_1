@@ -10,6 +10,7 @@ enum RolUsuario {
   terapeuta,
   secretaria_recepcion,
   doctora,
+  farmaceutica,
 }
 
 enum EspecialidadTerapeuta {
@@ -618,6 +619,8 @@ class Paciente {
   final String? servicioId;
   final String? clinica;
   final String? clinicaId;
+  // Foto del paciente
+  final String? fotoUrl;
   // Campos de inactivación (enfermera)
   final String? servicioRealizado;
   final String? servicioRealizadoId;
@@ -652,6 +655,7 @@ class Paciente {
     this.servicioId,
     this.clinica,
     this.clinicaId,
+    this.fotoUrl,
     this.servicioRealizado,
     this.servicioRealizadoId,
     this.fechaInactivacion,
@@ -685,6 +689,7 @@ class Paciente {
     'servicioId': servicioId ?? '',
     'clinica': clinica ?? '',
     'clinicaId': clinicaId ?? '',
+    'fotoUrl': fotoUrl ?? '',
   };
 
   Map<String, dynamic> toUpdateMap(String actualizadoPorUid) => {
@@ -708,6 +713,7 @@ class Paciente {
     'servicioId': servicioId ?? '',
     'clinica': clinica ?? '',
     'clinicaId': clinicaId ?? '',
+    'fotoUrl': fotoUrl ?? '',
   };
 
   factory Paciente.fromMap(Map<String, dynamic> map, String docId) {
@@ -746,6 +752,7 @@ class Paciente {
       servicioId: map['servicioId'],
       clinica: map['clinica'],
       clinicaId: map['clinicaId'],
+      fotoUrl: map['fotoUrl'],
       servicioRealizado: map['servicioRealizado'],
       servicioRealizadoId: map['servicioRealizadoId'],
       fechaInactivacion: parseFecha(map['fechaInactivacion']),

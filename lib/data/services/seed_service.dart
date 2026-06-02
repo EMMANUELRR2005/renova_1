@@ -32,6 +32,7 @@ class SeedService {
         // Siempre asegurar que existan servicios y clínicas
         await _ensureServiciosExisten();
         await _ensureClinicasExisten();
+        await _ensureMedicamentosExisten();
         await _firebaseAuth.signOut();
         return;
       }
@@ -47,6 +48,7 @@ class SeedService {
       await _seedPacientes();
       await _seedCitas();
       await _seedPlanes();
+      await _seedMedicamentos();
 
       await _firebaseAuth.signOut();
       print('✅ [Seed] Completado exitosamente');
@@ -445,6 +447,99 @@ class SeedService {
       await _seedClinicas();
     } else {
       print('✅ [Seed] Clínicas ya existen');
+    }
+  }
+
+  /// Verifica y crea medicamentos de ejemplo si no existen.
+  Future<void> _ensureMedicamentosExisten() async {
+    final snap = await _db.collection('medicamentos').limit(1).get();
+    if (snap.docs.isEmpty) {
+      print('🌱 [Seed] Creando medicamentos faltantes...');
+      await _seedMedicamentos();
+    } else {
+      print('✅ [Seed] Medicamentos ya existen');
+    }
+  }
+
+  Future<void> _seedMedicamentos() async {
+    // Idempotente: si ya hay medicamentos, no duplicar.
+    final existentes =
+        await _db.collection('medicamentos').limit(1).get();
+    if (existentes.docs.isNotEmpty) return;
+
+    print('Sembrando medicamentos...');
+    final medicamentos = [
+      {
+        'nombre': 'Paracetamol 500mg',
+        'nombreGenerico': 'Acetaminofén',
+        'marca': 'Genérico',
+        'codigoBarras': '7501234567890',
+        'codigoInterno': 'MED-0001',
+        'estante': 'A-1',
+        'descripcionEstante': 'Estante A, Nivel 1',
+        'cantidad': 100,
+        'cantidadMinima': 10,
+        'unidad': 'tabletas',
+        'categoria': 'Analgésico',
+        'presentacion': 'Caja x 10 tabletas',
+        'descripcion': '',
+        'precioCompra': 15.00,
+        'precioVenta': 25.00,
+        'requiereReceta': false,
+        'fechaVencimiento': '2027-12-31',
+      },
+      {
+        'nombre': 'Ibuprofeno 400mg',
+        'nombreGenerico': 'Ibuprofeno',
+        'marca': 'Genérico',
+        'codigoBarras': '7509876543210',
+        'codigoInterno': 'MED-0002',
+        'estante': 'A-2',
+        'descripcionEstante': 'Estante A, Nivel 2',
+        'cantidad': 80,
+        'cantidadMinima': 10,
+        'unidad': 'tabletas',
+        'categoria': 'Antiinflamatorio',
+        'presentacion': 'Caja x 10 tabletas',
+        'descripcion': '',
+        'precioCompra': 18.00,
+        'precioVenta': 30.00,
+        'requiereReceta': false,
+        'fechaVencimiento': '2027-06-30',
+      },
+      {
+        'nombre': 'Vitamina C 1000mg',
+        'nombreGenerico': 'Ácido Ascórbico',
+        'marca': 'Genérico',
+        'codigoBarras': '7505555555555',
+        'codigoInterno': 'MED-0003',
+        'estante': 'B-1',
+        'descripcionEstante': 'Estante B, Nivel 1',
+        'cantidad': 5,
+        'cantidadMinima': 10,
+        'unidad': 'tabletas',
+        'categoria': 'Vitamina',
+        'presentacion': 'Frasco x 30 tabletas',
+        'descripcion': '',
+        'precioCompra': 35.00,
+        'precioVenta': 55.00,
+        'requiereReceta': false,
+        'fechaVencimiento': '2026-12-31',
+      },
+    ];
+
+    for (final med in medicamentos) {
+      final ref = _db.collection('medicamentos').doc();
+      await ref.set({
+        ...med,
+        'id': ref.id,
+        'creadoPor': 'seed',
+        'nombreCreador': 'Sistema',
+        'fechaIngreso': FieldValue.serverTimestamp(),
+        'ultimaActualizacion': FieldValue.serverTimestamp(),
+        'actualizadoPor': 'seed',
+      });
+      print('  ✓ Medicamento creado: ${med['nombre']}');
     }
   }
 }
