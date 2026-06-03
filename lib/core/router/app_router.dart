@@ -13,13 +13,16 @@ import '../../features/pacientes/editar_paciente_screen.dart';
 import '../../features/pacientes/agregar_comentario_screen.dart';
 import '../../features/pacientes/nueva_consulta_screen.dart';
 import '../../features/citas/appointments_screen.dart';
+import '../../features/citas/calendario_citas_screen.dart';
 import '../../features/expedientes/expediente_screen.dart';
 import '../../features/caja/caja_screen.dart';
+import '../../features/caja/cierres_historico_screen.dart';
 import '../../features/terapeuta/agenda_terapeuta_screen.dart';
 import '../../features/usuarios/usuarios_screen.dart';
 import '../../features/reportes/reportes_screen.dart';
 import '../../features/farmacia/farmacia_screen.dart';
 import '../../features/farmacia/movimientos_farmacia_screen.dart';
+import '../../features/farmacia/alertas_farmacia_screen.dart';
 
 class GoRouterNotifier extends ChangeNotifier {
   void notifyListenersCustom() {
@@ -84,12 +87,20 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const AppointmentsScreen(),
       ),
       GoRoute(
+        path: '/citas/calendario',
+        builder: (context, state) => const CalendarioCitasScreen(),
+      ),
+      GoRoute(
         path: '/expedientes',
         builder: (context, state) => const ExpedienteScreen(),
       ),
       GoRoute(
         path: '/caja',
         builder: (context, state) => const CajaScreen(),
+      ),
+      GoRoute(
+        path: '/caja/cierres',
+        builder: (context, state) => const CierresHistoricoScreen(),
       ),
       GoRoute(
         path: '/agenda-terapeuta',
@@ -112,6 +123,10 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         path: '/farmacia/movimientos',
         builder: (context, state) => const MovimientosFarmaciaScreen(),
       ),
+      GoRoute(
+        path: '/farmacia/alertas',
+        builder: (context, state) => const AlertasFarmaciaScreen(),
+      ),
     ],
     redirect: (context, state) {
       final path = state.uri.path;
@@ -125,6 +140,12 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         }
         // Caja solo para secretaria
         if (path == '/caja' && rol != RolUsuario.secretaria_recepcion) {
+          return _getRutaInicial(rol);
+        }
+        // Histórico de cierres: secretaria y administradora
+        if (path == '/caja/cierres' &&
+            rol != RolUsuario.secretaria_recepcion &&
+            rol != RolUsuario.administradora) {
           return _getRutaInicial(rol);
         }
         // Reportes solo para administradora
@@ -152,6 +173,14 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         if (path == '/citas' &&
             rol != RolUsuario.secretaria_recepcion &&
             rol != RolUsuario.doctora) {
+          return _getRutaInicial(rol);
+        }
+        // Agenda/calendario: secretaria, doctora, enfermera y administradora
+        if (path == '/citas/calendario' &&
+            rol != RolUsuario.secretaria_recepcion &&
+            rol != RolUsuario.doctora &&
+            rol != RolUsuario.enfermera &&
+            rol != RolUsuario.administradora) {
           return _getRutaInicial(rol);
         }
         // Solo secretaria puede acceder a nuevo/editar

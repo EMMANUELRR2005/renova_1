@@ -11,6 +11,8 @@ import '../../data/mock/mock_data.dart';
 import '../../data/mock/providers.dart';
 import '../../data/services/catalogo_service.dart';
 import '../../features/auth/providers/auth_provider.dart';
+import '../expedientes/formulario_receta_screen.dart';
+import '../expedientes/receta_pdf.dart';
 
 class DetallePacienteScreen extends ConsumerWidget {
   const DetallePacienteScreen({super.key});
@@ -284,6 +286,15 @@ class DetallePacienteScreen extends ConsumerWidget {
                         onPressed: () => context.go('/pacientes/comentario'),
                         child: const Text('+ Agregar Nota'),
                       ),
+                    if (Permisos.puedeCrearRecetas(rol)) ...[
+                      const SizedBox(width: 8),
+                      OutlinedButton.icon(
+                        onPressed: () =>
+                            mostrarFormularioReceta(context, paciente),
+                        icon: const Icon(Icons.description, size: 16),
+                        label: const Text('Nueva Receta'),
+                      ),
+                    ],
                     if (Permisos.puedeCrearConsultas(rol)) ...[
                       const SizedBox(width: 8),
                       ElevatedButton(
@@ -321,7 +332,8 @@ class DetallePacienteScreen extends ConsumerWidget {
                     }
                     return Column(
                       children: historial
-                          .map((h) => _HistorialCard(entrada: h))
+                          .map((h) =>
+                              _HistorialCard(entrada: h, paciente: paciente))
                           .toList(),
                     );
                   },
@@ -434,7 +446,8 @@ class _EstadoBadge extends StatelessWidget {
 
 class _HistorialCard extends StatefulWidget {
   final HistorialConsulta entrada;
-  const _HistorialCard({required this.entrada});
+  final Paciente? paciente;
+  const _HistorialCard({required this.entrada, this.paciente});
 
   @override
   State<_HistorialCard> createState() => _HistorialCardState();
@@ -512,6 +525,8 @@ class _HistorialCardState extends State<_HistorialCard> {
                   ? _buildServiciosCobradosContent(h)
                   : h.tipo == 'servicio_realizado'
                       ? _buildServicioRealizadoContent(h)
+                      : h.tipo == 'receta_medica'
+                      ? _buildRecetaContent(h)
                       : Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
@@ -567,6 +582,8 @@ class _HistorialCardState extends State<_HistorialCard> {
         return const Color(0xFFC9A96E);
       case 'servicio_realizado':
         return AppColors.success;
+      case 'receta_medica':
+        return AppColors.primary;
       default:
         return AppColors.neutral;
     }
@@ -584,6 +601,8 @@ class _HistorialCardState extends State<_HistorialCard> {
         return 'Servicio Cobrado';
       case 'servicio_realizado':
         return 'Servicio Realizado';
+      case 'receta_medica':
+        return 'Receta Médica';
       default:
         return 'Comentario';
     }
@@ -595,6 +614,10 @@ class _HistorialCardState extends State<_HistorialCard> {
     }
     if (h.tipo == 'servicio_realizado') {
       return h.servicioRealizado;
+    }
+    if (h.tipo == 'receta_medica') {
+      final n = h.numeroReceta.isNotEmpty ? '${h.numeroReceta} · ' : '';
+      return '$n${h.diagnostico.isNotEmpty ? h.diagnostico : 'Receta médica'}';
     }
     if (h.motivo.isNotEmpty) return h.motivo;
     if (h.comentarios.isNotEmpty) return h.comentarios;
@@ -682,6 +705,70 @@ class _HistorialCardState extends State<_HistorialCard> {
         if (h.nota.isNotEmpty) _DetailRow('Nota', h.nota),
         _DetailRow('Registrado por', h.nombreEnfermera),
       ],
+    );
+  }
+
+  Widget _buildRecetaContent(HistorialConsulta h) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Divider(),
+        if (h.numeroReceta.isNotEmpty) _DetailRow('No. Receta', h.numeroReceta),
+        if (h.diagnostico.isNotEmpty) _DetailRow('Diagnóstico', h.diagnostico),
+        if (h.medicamentos.isNotEmpty) ...[
+          const SizedBox(height: 6),
+          const Text('Medicamentos:',
+              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+          const SizedBox(height: 4),
+          ...h.medicamentos.map((m) => Padding(
+                padding: const EdgeInsets.only(left: 12, bottom: 2),
+                child: Text(
+                  '• ${m.nombre} — ${m.dosis} — ${m.frecuencia} — ${m.duracion}',
+                  style: const TextStyle(fontSize: 12),
+                ),
+              )),
+        ],
+        if (h.comentarios.isNotEmpty) _DetailRow('Indicaciones', h.comentarios),
+        if (h.proximaCita != null && h.proximaCita!.isNotEmpty)
+          _DetailRow('Próxima cita', h.proximaCita!),
+        if (h.doctora.isNotEmpty) _DetailRow('Doctora', h.doctora),
+        const SizedBox(height: 8),
+        Align(
+          alignment: Alignment.centerRight,
+          child: OutlinedButton.icon(
+            onPressed: () => _regenerarRecetaPdf(h),
+            icon: const Icon(Icons.picture_as_pdf, size: 16),
+            label: const Text('Ver PDF'),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _regenerarRecetaPdf(HistorialConsulta h) async {
+    final paciente = widget.paciente;
+    if (paciente == null) return;
+    final medicamentos = h.medicamentos
+        .map((m) => {
+              'nombre': m.nombre,
+              'dosis': m.dosis,
+              'frecuencia': m.frecuencia,
+              'duracion': m.duracion,
+              'instrucciones': '',
+            })
+        .toList();
+    await RecetaPDF.generarYMostrar(
+      nombrePaciente: paciente.nombreCompleto,
+      edadPaciente: paciente.edad,
+      identificacionPaciente: paciente.numeroIdentificacion.isEmpty
+          ? '—'
+          : paciente.numeroIdentificacion,
+      nombreDoctora: h.doctora,
+      diagnostico: h.diagnostico,
+      medicamentos: medicamentos,
+      indicaciones: h.comentarios,
+      proximaCita: h.proximaCita,
+      numeroReceta: h.numeroReceta,
     );
   }
 

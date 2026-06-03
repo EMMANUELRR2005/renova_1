@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../core/auth/permisos.dart';
@@ -46,10 +47,22 @@ class AppointmentsScreen extends ConsumerWidget {
                     fontFamily: GoogleFonts.dmSans().fontFamily,
                   ),
                 ),
-                if (Permisos.puedeCrearCitas(rol))
+                if (Permisos.puedeCrearCitas(rol)) ...[
+                  OutlinedButton.icon(
+                    onPressed: () => context.go('/citas/calendario'),
+                    icon: const Icon(Icons.calendar_month, size: 18),
+                    label: const Text('Vista Agenda'),
+                  ),
+                  const SizedBox(width: 8),
                   ElevatedButton(
-                    onPressed: () => _mostrarFormularioNuevaCita(context, ref),
+                    onPressed: () => mostrarFormularioNuevaCita(context, ref),
                     child: const Text('+ Nueva Cita'),
+                  ),
+                ] else
+                  OutlinedButton.icon(
+                    onPressed: () => context.go('/citas/calendario'),
+                    icon: const Icon(Icons.calendar_month, size: 18),
+                    label: const Text('Vista Agenda'),
                   ),
               ],
             ),
@@ -382,7 +395,7 @@ class AppointmentsScreen extends ConsumerWidget {
 
 // ── Formulario Nueva Cita ───────────────────────────────────────────────────
 
-void _mostrarFormularioNuevaCita(BuildContext context, WidgetRef ref) {
+void mostrarFormularioNuevaCita(BuildContext context, WidgetRef ref) {
   showDialog(
     context: context,
     builder: (ctx) => Dialog(

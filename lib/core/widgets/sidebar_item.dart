@@ -7,6 +7,7 @@ class SidebarItem extends StatelessWidget {
   final String label;
   final bool isActive;
   final VoidCallback onTap;
+  final int badgeCount;
 
   const SidebarItem({
     Key? key,
@@ -14,6 +15,7 @@ class SidebarItem extends StatelessWidget {
     required this.label,
     required this.isActive,
     required this.onTap,
+    this.badgeCount = 0,
   }) : super(key: key);
 
   @override
@@ -45,15 +47,36 @@ class SidebarItem extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 12),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
-                color: isActive ? Colors.white : AppColors.textTertiary,
-                fontFamily: GoogleFonts.dmSans().fontFamily,
+            Expanded(
+              child: Text(
+                label,
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                  color: isActive ? Colors.white : AppColors.textTertiary,
+                  fontFamily: GoogleFonts.dmSans().fontFamily,
+                ),
               ),
             ),
+            if (badgeCount > 0)
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                constraints: const BoxConstraints(minWidth: 20),
+                decoration: BoxDecoration(
+                  color: AppColors.danger,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text(
+                  badgeCount > 99 ? '99+' : '$badgeCount',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
           ],
         ),
       ),

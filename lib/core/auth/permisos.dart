@@ -39,6 +39,10 @@ class Permisos {
   static bool puedeCrearConsultas(RolUsuario? rol) =>
       rol == RolUsuario.doctora || rol == RolUsuario.enfermera;
 
+  // Crear recetas médicas: solo doctora
+  static bool puedeCrearRecetas(RolUsuario? rol) =>
+      rol == RolUsuario.doctora;
+
   static bool puedeVerReportes(RolUsuario? rol) =>
       rol == RolUsuario.administradora;
 

@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:intl/intl.dart';
 
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/app_shell.dart';
+import '../../data/mock/providers.dart';
 import '../../data/services/venta_service.dart';
 import '../../data/services/cita_service.dart';
 import '../../data/services/paciente_service.dart';
@@ -110,6 +112,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                   children: [
                     _buildHeader(),
                     const SizedBox(height: 20),
+                    _buildBannerAlertas(),
                     _buildKPICards(),
                     const SizedBox(height: 24),
                     _buildChartsRow(),
@@ -184,6 +187,38 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
             color: seleccionado ? Colors.white : AppColors.textSecondary,
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildBannerAlertas() {
+    final alertas = ref.watch(alertasFarmaciaProvider);
+    if (!alertas.hayAlertas) return const SizedBox.shrink();
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.dangerBg,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppColors.danger.withValues(alpha: 0.4)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.warning_amber, color: AppColors.danger),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              'Hay ${alertas.total} alerta${alertas.total == 1 ? '' : 's'} en el inventario de farmacia '
+              '(${alertas.sinStock.length} sin stock, ${alertas.stockBajo.length} stock bajo, '
+              '${alertas.porVencer.length} por vencer).',
+              style: const TextStyle(color: AppColors.danger),
+            ),
+          ),
+          TextButton(
+            onPressed: () => context.go('/farmacia/alertas'),
+            child: const Text('Ver alertas'),
+          ),
+        ],
       ),
     );
   }

@@ -269,6 +269,18 @@ final citasDoctoraStreamProvider = StreamProvider<List<CitaMedica>>((ref) {
   return ref.watch(citaServiceProvider).streamCitasDoctora(usuario.id);
 });
 
+/// Stream con TODAS las citas médicas (sin filtro de fecha) para la agenda
+/// visual / calendario. Si el usuario es doctora, solo trae sus citas.
+final todasCitasMedicasStreamProvider = StreamProvider<List<CitaMedica>>((ref) {
+  final usuario = ref.watch(usuarioActivoProvider);
+  if (usuario == null) return const Stream.empty();
+  final citaService = ref.watch(citaServiceProvider);
+  if (usuario.rol == RolUsuario.doctora) {
+    return citaService.streamCitasDoctora(usuario.id);
+  }
+  return citaService.streamCitasMedicas();
+});
+
 // ============================================================================
 // VENTAS / CAJA (SECRETARIA)
 // ============================================================================
@@ -353,5 +365,68 @@ final movimientosFarmaciaStreamProvider =
   final usuario = ref.watch(usuarioActivoProvider);
   if (usuario == null) return const Stream.empty();
   return ref.watch(farmaciaServiceProvider).streamMovimientos();
+});
+
+/// Resultado de la verificación de alertas de inventario.
+class AlertasFarmacia {
+  /// Medicamentos próximos a vencer (<= 30 días). Cada entrada incluye los
+  /// días restantes en [diasParaVencer].
+  final List<Medicamento> porVencer;
+  final List<Medicamento> stockBajo;
+  final List<Medicamento> sinStock;
+
+  const AlertasFarmacia({
+    this.porVencer = const [],
+    this.stockBajo = const [],
+    this.sinStock = const [],
+  });
+
+  int get total => porVencer.length + stockBajo.length + sinStock.length;
+  bool get hayAlertas => total > 0;
+}
+
+/// Días restantes (puede ser negativo si ya venció) a partir de la
+/// fechaVencimiento almacenada como texto 'AAAA-MM-DD'.
+int? diasParaVencer(Medicamento m) {
+  if (m.fechaVencimiento.trim().isEmpty) return null;
+  final fecha = DateTime.tryParse(m.fechaVencimiento.trim());
+  if (fecha == null) return null;
+  final hoy = DateTime.now();
+  return DateTime(fecha.year, fecha.month, fecha.day)
+      .difference(DateTime(hoy.year, hoy.month, hoy.day))
+      .inDays;
+}
+
+/// Provider derivado del inventario en tiempo real que clasifica las alertas.
+/// Realtime: se recalcula automáticamente cuando cambia el stock.
+final alertasFarmaciaProvider = Provider<AlertasFarmacia>((ref) {
+  final medsAsync = ref.watch(medicamentosStreamProvider);
+  final meds = medsAsync.asData?.value;
+  if (meds == null) return const AlertasFarmacia();
+
+  final porVencer = <Medicamento>[];
+  final stockBajo = <Medicamento>[];
+  final sinStock = <Medicamento>[];
+
+  for (final m in meds) {
+    if (m.cantidad <= 0) {
+      sinStock.add(m);
+    } else if (m.cantidad <= m.cantidadMinima) {
+      stockBajo.add(m);
+    }
+    final dias = diasParaVencer(m);
+    if (dias != null && dias <= 30) {
+      porVencer.add(m);
+    }
+  }
+
+  porVencer.sort((a, b) => (diasParaVencer(a) ?? 9999)
+      .compareTo(diasParaVencer(b) ?? 9999));
+
+  return AlertasFarmacia(
+    porVencer: porVencer,
+    stockBajo: stockBajo,
+    sinStock: sinStock,
+  );
 });
 

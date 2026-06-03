@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../features/auth/providers/auth_provider.dart';
+import '../../data/mock/providers.dart';
 import '../theme/app_theme.dart';
 import 'sidebar_item.dart';
 import '../../data/mock/mock_data.dart';
@@ -12,12 +13,14 @@ class AppShell extends ConsumerWidget {
   final Widget child;
   final int selectedIndex;
   final Function(int) onNavigate;
+  final Widget? floatingActionButton;
 
   const AppShell({
     Key? key,
     required this.child,
     required this.selectedIndex,
     required this.onNavigate,
+    this.floatingActionButton,
   }) : super(key: key);
 
   @override
@@ -26,6 +29,7 @@ class AppShell extends ConsumerWidget {
     final rol = usuarioActivo?.rol;
 
     return Scaffold(
+      floatingActionButton: floatingActionButton,
       body: Row(
         children: [
           // SIDEBAR
@@ -187,6 +191,12 @@ class AppShell extends ConsumerWidget {
       BuildContext context, WidgetRef ref, RolUsuario? rol, Function(int) onNavigate, int selectedIndex) {
     final items = <Widget>[];
 
+    // Alertas de farmacia (solo se observa para roles con acceso a farmacia).
+    final int alertasFarmacia =
+        (rol == RolUsuario.administradora || rol == RolUsuario.farmaceutica)
+            ? ref.watch(alertasFarmaciaProvider).total
+            : 0;
+
     // ADMINISTRADORA: Dashboard, Usuarios, Reportes
     if (rol == RolUsuario.administradora) {
       items.addAll([
@@ -221,9 +231,28 @@ class AppShell extends ConsumerWidget {
           icon: '💊',
           label: 'Farmacia',
           isActive: selectedIndex == 3,
+          badgeCount: alertasFarmacia,
           onTap: () {
             onNavigate(3);
             context.go('/farmacia');
+          },
+        ),
+        SidebarItem(
+          icon: '📆',
+          label: 'Agenda',
+          isActive: selectedIndex == 4,
+          onTap: () {
+            onNavigate(4);
+            context.go('/citas/calendario');
+          },
+        ),
+        SidebarItem(
+          icon: '🧾',
+          label: 'Cierres Caja',
+          isActive: selectedIndex == 5,
+          onTap: () {
+            onNavigate(5);
+            context.go('/caja/cierres');
           },
         ),
         const Padding(
@@ -239,6 +268,7 @@ class AppShell extends ConsumerWidget {
           icon: '💊',
           label: 'Inventario',
           isActive: selectedIndex == 0,
+          badgeCount: alertasFarmacia,
           onTap: () {
             onNavigate(0);
             context.go('/farmacia');
@@ -251,6 +281,16 @@ class AppShell extends ConsumerWidget {
           onTap: () {
             onNavigate(1);
             context.go('/farmacia/movimientos');
+          },
+        ),
+        SidebarItem(
+          icon: '⚠️',
+          label: 'Alertas',
+          isActive: selectedIndex == 2,
+          badgeCount: alertasFarmacia,
+          onTap: () {
+            onNavigate(2);
+            context.go('/farmacia/alertas');
           },
         ),
         const Padding(
@@ -289,6 +329,15 @@ class AppShell extends ConsumerWidget {
             context.go('/caja');
           },
         ),
+        SidebarItem(
+          icon: '📆',
+          label: 'Agenda',
+          isActive: selectedIndex == 3,
+          onTap: () {
+            onNavigate(3);
+            context.go('/citas/calendario');
+          },
+        ),
         const Padding(
           padding: EdgeInsets.symmetric(vertical: 8),
           child: Divider(color: Color(0xFF1A3F5C)),
@@ -314,6 +363,15 @@ class AppShell extends ConsumerWidget {
           onTap: () {
             onNavigate(1);
             context.go('/expedientes');
+          },
+        ),
+        SidebarItem(
+          icon: '📆',
+          label: 'Agenda',
+          isActive: selectedIndex == 2,
+          onTap: () {
+            onNavigate(2);
+            context.go('/citas/calendario');
           },
         ),
         const Padding(
@@ -350,6 +408,15 @@ class AppShell extends ConsumerWidget {
           onTap: () {
             onNavigate(2);
             context.go('/expedientes');
+          },
+        ),
+        SidebarItem(
+          icon: '📆',
+          label: 'Agenda',
+          isActive: selectedIndex == 3,
+          onTap: () {
+            onNavigate(3);
+            context.go('/citas/calendario');
           },
         ),
         const Padding(

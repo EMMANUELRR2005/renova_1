@@ -66,6 +66,7 @@ class _FarmaciaScreenState extends ConsumerState<FarmaciaScreen> {
     final usuario = ref.watch(usuarioActivoProvider);
     final rol = usuario?.rol;
     final medsAsync = ref.watch(medicamentosStreamProvider);
+    final alertas = ref.watch(alertasFarmaciaProvider);
 
     return AppShell(
       selectedIndex: _sidebarIndex(rol),
@@ -88,6 +89,11 @@ class _FarmaciaScreenState extends ConsumerState<FarmaciaScreen> {
                   ),
                 ),
                 const Spacer(),
+                _BotonAlertas(
+                  count: alertas.total,
+                  onTap: () => context.go('/farmacia/alertas'),
+                ),
+                const SizedBox(width: 12),
                 OutlinedButton.icon(
                   onPressed: () =>
                       context.go('/farmacia/movimientos'),
@@ -450,6 +456,56 @@ class _MedicamentoCard extends StatelessWidget {
             style: TextStyle(
                 fontSize: 9, fontWeight: FontWeight.w700, color: color)),
       );
+}
+
+// ── Botón de alertas con badge ──────────────────────────────────────────────
+
+class _BotonAlertas extends StatelessWidget {
+  final int count;
+  final VoidCallback onTap;
+  const _BotonAlertas({required this.count, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final hay = count > 0;
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        OutlinedButton.icon(
+          onPressed: onTap,
+          style: OutlinedButton.styleFrom(
+            foregroundColor: hay ? AppColors.danger : AppColors.textSecondary,
+            side: BorderSide(
+                color: hay ? AppColors.danger : AppColors.border),
+          ),
+          icon: Icon(hay ? Icons.warning_amber : Icons.notifications_none,
+              size: 18),
+          label: const Text('Alertas'),
+        ),
+        if (hay)
+          Positioned(
+            right: -6,
+            top: -6,
+            child: Container(
+              padding: const EdgeInsets.all(4),
+              constraints: const BoxConstraints(minWidth: 20),
+              decoration: const BoxDecoration(
+                color: AppColors.danger,
+                shape: BoxShape.circle,
+              ),
+              child: Text(
+                count > 99 ? '99+' : '$count',
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
 }
 
 // ════════════════════════════════════════════════════════════════════════════

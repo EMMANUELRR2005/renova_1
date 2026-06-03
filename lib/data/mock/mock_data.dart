@@ -792,6 +792,8 @@ class HistorialConsulta {
   final String servicioRealizado;
   final String nombreEnfermera;
   final String nota;
+  // Receta médica
+  final String numeroReceta;
 
   HistorialConsulta({
     required this.id,
@@ -819,6 +821,7 @@ class HistorialConsulta {
     this.servicioRealizado = '',
     this.nombreEnfermera = '',
     this.nota = '',
+    this.numeroReceta = '',
   });
 
   Map<String, dynamic> toMap() => {
@@ -878,6 +881,7 @@ class HistorialConsulta {
       servicioRealizado: map['servicio'] ?? '',
       nombreEnfermera: map['nombreEnfermera'] ?? '',
       nota: map['nota'] ?? '',
+      numeroReceta: map['numeroReceta'] ?? '',
     );
   }
 }

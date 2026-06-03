@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../core/theme/app_theme.dart';
@@ -12,9 +13,11 @@ import '../../data/services/catalogo_service.dart';
 import '../../data/services/paciente_service.dart';
 import '../../data/services/email_service.dart';
 import '../../data/services/farmacia_service.dart';
+import '../../data/services/cierre_service.dart';
 import '../../data/mock/mock_data.dart' hide Medicamento;
 import '../../features/auth/providers/auth_provider.dart';
 import 'factura_pdf.dart';
+import 'cierre_caja_pdf.dart';
 
 class CajaScreen extends ConsumerStatefulWidget {
   const CajaScreen({super.key});
@@ -81,6 +84,22 @@ class _CajaScreenState extends ConsumerState<CajaScreen> {
                 ),
                 const Spacer(),
                 _buildFiltros(filtro),
+                const SizedBox(width: 12),
+                OutlinedButton.icon(
+                  onPressed: () => context.go('/caja/cierres'),
+                  icon: const Icon(Icons.history, size: 18),
+                  label: const Text('Cierres'),
+                ),
+                const SizedBox(width: 12),
+                OutlinedButton.icon(
+                  onPressed: () => _realizarCierre(context),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.clinicalGreen,
+                    side: const BorderSide(color: AppColors.clinicalGreen),
+                  ),
+                  icon: const Icon(Icons.lock_outline, size: 18),
+                  label: const Text('Cierre de Caja'),
+                ),
                 const SizedBox(width: 12),
                 ElevatedButton.icon(
                   onPressed: () => _mostrarFormularioCobro(context),
@@ -471,6 +490,192 @@ class _CajaScreenState extends ConsumerState<CajaScreen> {
     );
   }
 
+  Future<void> _realizarCierre(BuildContext context) async {
+    final service = CierreService();
+    final usuario = ref.read(usuarioActivoProvider);
+
+    // Mostrar loader breve mientras se consulta.
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const Center(child: CircularProgressIndicator()),
+    );
+
+    try {
+      final existente = await service.getCierreDelDia();
+      if (!mounted) return;
+      Navigator.of(context).pop(); // cerrar loader
+
+      if (existente != null) {
+        _mostrarCierreExistente(existente);
+        return;
+      }
+
+      final cierre = await service.calcularCierre(
+        realizadoPor: usuario?.id ?? '',
+        nombreSecretaria: usuario?.nombre ?? '',
+      );
+      if (!mounted) return;
+      _mostrarConfirmacionCierre(cierre, service);
+    } catch (e) {
+      if (mounted) {
+        Navigator.of(context).pop();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e'), backgroundColor: AppColors.danger),
+        );
+      }
+    }
+  }
+
+  void _mostrarCierreExistente(CierreCaja cierre) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.check_circle, color: AppColors.success),
+            SizedBox(width: 8),
+            Text('Cierre ya realizado'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('El cierre de caja de hoy ya fue realizado.'),
+            const SizedBox(height: 12),
+            _resumenCierreRow('Total cobrado',
+                'Q ${cierre.totalGeneral.toStringAsFixed(2)}'),
+            _resumenCierreRow(
+                'Transacciones', '${cierre.cantidadTransacciones}'),
+            _resumenCierreRow('Responsable', cierre.nombreSecretaria),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Cerrar'),
+          ),
+          ElevatedButton.icon(
+            onPressed: () {
+              Navigator.of(ctx).pop();
+              CierreCajaPDF.generarYMostrar(cierre);
+            },
+            icon: const Icon(Icons.picture_as_pdf, size: 18),
+            label: const Text('Ver PDF'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _mostrarConfirmacionCierre(CierreCaja cierre, CierreService service) {
+    bool guardando = false;
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setLocal) => AlertDialog(
+          title: const Text('Realizar Cierre de Caja'),
+          content: SizedBox(
+            width: 380,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Resumen del día:'),
+                const SizedBox(height: 12),
+                _resumenCierreRow('Efectivo',
+                    'Q ${cierre.totalEfectivo.toStringAsFixed(2)}'),
+                _resumenCierreRow('Tarjeta',
+                    'Q ${cierre.totalTarjeta.toStringAsFixed(2)}'),
+                _resumenCierreRow('Visa Cuotas',
+                    'Q ${cierre.totalVisaCuotas.toStringAsFixed(2)}'),
+                const Divider(),
+                _resumenCierreRow(
+                    'TOTAL', 'Q ${cierre.totalGeneral.toStringAsFixed(2)}',
+                    bold: true),
+                _resumenCierreRow('Anulados',
+                    'Q ${cierre.totalAnulados.toStringAsFixed(2)}'),
+                _resumenCierreRow(
+                    'Transacciones', '${cierre.cantidadTransacciones}'),
+                const SizedBox(height: 8),
+                const Text(
+                  'Esta acción no se puede deshacer. Solo se permite un cierre por día.',
+                  style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed:
+                  guardando ? null : () => Navigator.of(ctx).pop(),
+              child: const Text('Cancelar'),
+            ),
+            ElevatedButton(
+              onPressed: guardando
+                  ? null
+                  : () async {
+                      setLocal(() => guardando = true);
+                      try {
+                        await service.guardarCierre(cierre);
+                        if (ctx.mounted) Navigator.of(ctx).pop();
+                        await CierreCajaPDF.generarYMostrar(cierre);
+                        if (mounted) {
+                          _cargarResumen();
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Cierre de caja realizado'),
+                              backgroundColor: AppColors.success,
+                            ),
+                          );
+                        }
+                      } catch (e) {
+                        setLocal(() => guardando = false);
+                        if (ctx.mounted) {
+                          ScaffoldMessenger.of(ctx).showSnackBar(
+                            SnackBar(
+                                content: Text('Error: $e'),
+                                backgroundColor: AppColors.danger),
+                          );
+                        }
+                      }
+                    },
+              child: guardando
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                          strokeWidth: 2, color: Colors.white),
+                    )
+                  : const Text('Confirmar Cierre'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _resumenCierreRow(String label, String value, {bool bold = false}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 3),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label,
+              style: TextStyle(
+                  fontWeight: bold ? FontWeight.bold : FontWeight.normal,
+                  color: bold ? AppColors.primary : null)),
+          Text(value,
+              style: TextStyle(
+                  fontWeight: bold ? FontWeight.bold : FontWeight.w600,
+                  color: bold ? AppColors.primary : null)),
+        ],
+      ),
+    );
+  }
+
   Future<void> _enviarFacturaPorEmail(Venta venta) async {
     showDialog(
       context: context,
@@ -608,6 +813,26 @@ class _NuevoCobroDialogState extends ConsumerState<_NuevoCobroDialog> {
   // Cliente: registrado (paciente) o externo.
   bool _esPaciente = true;
   final _nombreClienteController = TextEditingController();
+  final _emailClienteController = TextEditingController();
+  // Para paciente registrado con email: decidir si enviar factura.
+  bool _enviarEmailPaciente = true;
+
+  /// Valida el email del cliente externo (vacío = válido, es opcional).
+  bool get _emailExternoValido {
+    final e = _emailClienteController.text.trim();
+    if (e.isEmpty) return true;
+    return RegExp(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$')
+        .hasMatch(e);
+  }
+
+  /// Email al que se enviará la factura según el tipo de cliente y opciones.
+  String get _emailFacturaResumen {
+    if (_esPaciente && _pacienteSeleccionado != null) {
+      final e = _pacienteSeleccionado!.email.trim();
+      return (e.isNotEmpty && _enviarEmailPaciente) ? e : '';
+    }
+    return _emailClienteController.text.trim();
+  }
 
   List<ItemVenta> _items = [];
   String? _clinicaId;
@@ -667,6 +892,7 @@ class _NuevoCobroDialogState extends ConsumerState<_NuevoCobroDialog> {
     }
     _nitController.dispose();
     _nombreClienteController.dispose();
+    _emailClienteController.dispose();
     _referenciaController.dispose();
     _medBuscarCtrl.dispose();
     super.dispose();
@@ -1012,6 +1238,30 @@ class _NuevoCobroDialogState extends ConsumerState<_NuevoCobroDialog> {
               border: OutlineInputBorder(),
             ),
           ),
+          // Si el paciente tiene email, permitir decidir si enviar la factura.
+          if (_pacienteSeleccionado!.email.trim().isNotEmpty)
+            Container(
+              margin: const EdgeInsets.only(top: 8),
+              decoration: BoxDecoration(
+                color: AppColors.primary.withValues(alpha: 0.04),
+                borderRadius: BorderRadius.circular(8),
+                border:
+                    Border.all(color: AppColors.primary.withValues(alpha: 0.2)),
+              ),
+              child: SwitchListTile(
+                title: const Text('Enviar factura por email'),
+                subtitle: Text(
+                  _pacienteSeleccionado!.email,
+                  style: const TextStyle(
+                      color: AppColors.textSecondary, fontSize: 12),
+                ),
+                secondary: const Icon(Icons.email_outlined,
+                    color: AppColors.primary),
+                value: _enviarEmailPaciente,
+                activeColor: AppColors.primary,
+                onChanged: (v) => setState(() => _enviarEmailPaciente = v),
+              ),
+            ),
         ],
       ],
     );
@@ -1041,6 +1291,28 @@ class _NuevoCobroDialogState extends ConsumerState<_NuevoCobroDialog> {
           ),
         ),
         const SizedBox(height: 12),
+        // Email (opcional): si se ingresa, la factura se envía automáticamente.
+        TextField(
+          controller: _emailClienteController,
+          keyboardType: TextInputType.emailAddress,
+          autocorrect: false,
+          onChanged: (_) => setState(() {}),
+          decoration: InputDecoration(
+            labelText: 'Email (opcional)',
+            hintText: 'Para enviar la factura',
+            prefixIcon: const Icon(Icons.email_outlined),
+            border: const OutlineInputBorder(),
+            suffixIcon: _emailClienteController.text.trim().isNotEmpty
+                ? const Icon(Icons.send, color: AppColors.primary)
+                : null,
+            errorText: _emailExternoValido ? null : 'Ingresa un email válido',
+            helperText:
+                'Si ingresas un email recibirá la factura automáticamente',
+            helperStyle:
+                const TextStyle(color: AppColors.textSecondary, fontSize: 11),
+          ),
+        ),
+        const SizedBox(height: 12),
         Container(
           padding: const EdgeInsets.all(10),
           decoration: BoxDecoration(
@@ -1054,7 +1326,7 @@ class _NuevoCobroDialogState extends ConsumerState<_NuevoCobroDialog> {
               SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  'Puedes vender sin registrar datos del cliente. La venta quedará como anónima ("Cliente Externo").',
+                  'Todos los campos son opcionales. Si agregas email, la factura se enviará automáticamente al confirmar el cobro.',
                   style: TextStyle(fontSize: 12, color: AppColors.primary),
                 ),
               ),
@@ -1529,6 +1801,8 @@ class _NuevoCobroDialogState extends ConsumerState<_NuevoCobroDialog> {
                         : _nombreClienteController.text.trim()),
               ),
               _ConfirmRow('NIT', _nitController.text.isEmpty ? 'CF' : _nitController.text),
+              if (_emailFacturaResumen.isNotEmpty)
+                _ConfirmRow('Email factura', _emailFacturaResumen),
               _ConfirmRow('Clínica', _clinicaNombre ?? ''),
               const Divider(),
               const Text(
@@ -1642,9 +1916,10 @@ class _NuevoCobroDialogState extends ConsumerState<_NuevoCobroDialog> {
   bool _puedeAvanzar() {
     switch (_paso) {
       case 1:
-        // Cliente externo siempre puede avanzar (datos opcionales);
-        // paciente registrado requiere selección.
-        return !_esPaciente || _pacienteSeleccionado != null;
+        // Cliente externo: datos opcionales, pero el email (si se ingresa)
+        // debe ser válido. Paciente registrado requiere selección.
+        if (!_esPaciente) return _emailExternoValido;
+        return _pacienteSeleccionado != null;
       case 2:
         if (_clinicaId == null) return false;
         // Una fila de servicio "parcial" (servicio sin monto o viceversa) bloquea.
@@ -1729,7 +2004,7 @@ class _NuevoCobroDialogState extends ConsumerState<_NuevoCobroDialog> {
             ? 'Cliente Externo'
             : _nombreClienteController.text.trim();
         telefonoCliente = '';
-        emailCliente = '';
+        emailCliente = _emailClienteController.text.trim();
       }
 
       // Tipo de venta para reportes.
@@ -1792,13 +2067,47 @@ class _NuevoCobroDialogState extends ConsumerState<_NuevoCobroDialog> {
         );
       }
 
+      // 5. Enviar factura automáticamente si hay email:
+      //    - cliente externo: siempre que haya email.
+      //    - paciente registrado: solo si el switch está activado.
+      final debeEnviar = emailCliente.isNotEmpty &&
+          (!esPacienteReg || _enviarEmailPaciente);
+      bool emailEnviado = false;
+      if (debeEnviar) {
+        try {
+          final pdfBytes = await FacturaPDF.generarBytes(venta: venta);
+          emailEnviado = await EmailService.enviarFactura(
+            emailDestino: emailCliente,
+            nombrePaciente: nombreCliente,
+            numeroFactura: correlativo.replaceAll('VTA', 'FAC'),
+            pdfBytes: pdfBytes,
+          );
+        } catch (_) {
+          // No bloquear el flujo: la venta ya quedó guardada.
+          emailEnviado = false;
+        }
+      }
+
       if (mounted) {
         Navigator.of(context).pop();
         widget.onCobroCreado();
+        final String mensaje;
+        final Color colorMensaje;
+        if (emailEnviado) {
+          mensaje = 'Cobro registrado: $correlativo · Factura enviada a $emailCliente';
+          colorMensaje = AppColors.success;
+        } else if (debeEnviar) {
+          mensaje = 'Cobro registrado: $correlativo · No se pudo enviar el email';
+          colorMensaje = AppColors.warning;
+        } else {
+          mensaje = 'Cobro registrado: $correlativo';
+          colorMensaje = AppColors.success;
+        }
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Cobro registrado: $correlativo'),
-            backgroundColor: AppColors.success,
+            content: Text(mensaje),
+            backgroundColor: colorMensaje,
+            duration: const Duration(seconds: 4),
           ),
         );
       }
