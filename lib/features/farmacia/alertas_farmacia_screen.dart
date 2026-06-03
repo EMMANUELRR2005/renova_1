@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../../core/auth/permisos.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/app_shell.dart';
 import '../../data/mock/mock_data.dart' hide Medicamento;
@@ -22,6 +23,7 @@ class AlertasFarmaciaScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final rol = ref.watch(usuarioActivoProvider)?.rol;
     final alertas = ref.watch(alertasFarmaciaProvider);
+    final puedeEliminar = Permisos.puedeGestionarMedicamentos(rol);
 
     return AppShell(
       selectedIndex: _sidebarIndex(rol),
@@ -69,6 +71,13 @@ class AlertasFarmaciaScreen extends ConsumerWidget {
             if (!alertas.hayAlertas)
               _todoBien()
             else ...[
+              if (alertas.vencidos.isNotEmpty)
+                _SeccionVencidos(
+                  items: alertas.vencidos,
+                  puedeEliminar: puedeEliminar,
+                  onEliminar: (m) =>
+                      _confirmarEliminarVencido(context, ref, m),
+                ),
               if (alertas.sinStock.isNotEmpty)
                 _Seccion(
                   titulo: '🔴 Sin Stock',
@@ -105,6 +114,81 @@ class AlertasFarmaciaScreen extends ConsumerWidget {
     );
   }
 
+  Future<void> _confirmarEliminarVencido(
+      BuildContext context, WidgetRef ref, Medicamento med) async {
+    final dias = (diasParaVencer(med) ?? 0).abs();
+    final confirmar = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.warning_amber, color: AppColors.danger),
+            SizedBox(width: 8),
+            Expanded(child: Text('Eliminar medicamento vencido')),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('¿Eliminar "${med.nombre}"?',
+                style: const TextStyle(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            Text(
+              'Venció hace $dias días\n'
+              'Stock a eliminar: ${med.cantidad} ${med.unidad}\n'
+              'Estante: ${med.estante.isEmpty ? '—' : med.estante}',
+              style: const TextStyle(color: AppColors.textSecondary),
+            ),
+            const SizedBox(height: 12),
+            const Text('⚠️ Esta acción no se puede deshacer.',
+                style: TextStyle(color: AppColors.danger, fontSize: 12)),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancelar'),
+          ),
+          ElevatedButton.icon(
+            onPressed: () => Navigator.pop(ctx, true),
+            icon: const Icon(Icons.delete, color: Colors.white, size: 18),
+            label: const Text('Sí, eliminar',
+                style: TextStyle(color: Colors.white)),
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.danger),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmar != true) return;
+
+    try {
+      final usuario = ref.read(usuarioActivoProvider);
+      await ref.read(farmaciaServiceProvider).eliminarMedicamentoVencido(
+            med,
+            uid: usuario?.id ?? '',
+            nombreResponsable: usuario?.nombre ?? '',
+          );
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('${med.nombre} eliminado'),
+            backgroundColor: AppColors.success,
+          ),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+              content: Text('Error: $e'),
+              backgroundColor: AppColors.danger),
+        );
+      }
+    }
+  }
+
   Widget _todoBien() => Container(
         width: double.infinity,
         padding: const EdgeInsets.all(48),
@@ -125,6 +209,85 @@ class AlertasFarmaciaScreen extends ConsumerWidget {
           ],
         ),
       );
+}
+
+class _SeccionVencidos extends StatelessWidget {
+  final List<Medicamento> items;
+  final bool puedeEliminar;
+  final void Function(Medicamento) onEliminar;
+
+  const _SeccionVencidos({
+    required this.items,
+    required this.puedeEliminar,
+    required this.onEliminar,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 16),
+      decoration: BoxDecoration(
+        color: AppColors.dangerBg,
+        border: Border.all(color: AppColors.danger.withValues(alpha: 0.5)),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            decoration: BoxDecoration(
+              color: AppColors.danger.withValues(alpha: 0.12),
+              borderRadius:
+                  const BorderRadius.vertical(top: Radius.circular(9)),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.dangerous, color: AppColors.danger),
+                const SizedBox(width: 8),
+                Text('🚫 MEDICAMENTOS VENCIDOS (${items.length})',
+                    style: const TextStyle(
+                        color: AppColors.danger,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 15)),
+              ],
+            ),
+          ),
+          ...items.map((m) {
+            final dias = (diasParaVencer(m) ?? 0).abs();
+            return ListTile(
+              leading: const Icon(Icons.warning_amber,
+                  color: AppColors.danger, size: 30),
+              title: Text(m.nombre,
+                  style: const TextStyle(fontWeight: FontWeight.bold)),
+              subtitle: Text(
+                'Venció hace $dias días · Estante: ${m.estante.isEmpty ? '—' : m.estante} · '
+                'Stock: ${m.cantidad} ${m.unidad}',
+                style: const TextStyle(color: AppColors.danger, fontSize: 12),
+              ),
+              trailing: puedeEliminar
+                  ? ElevatedButton.icon(
+                      onPressed: () => onEliminar(m),
+                      icon: const Icon(Icons.delete,
+                          color: Colors.white, size: 16),
+                      label: const Text('Eliminar',
+                          style: TextStyle(
+                              color: Colors.white, fontSize: 12)),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.danger,
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 8),
+                      ),
+                    )
+                  : null,
+            );
+          }),
+        ],
+      ),
+    );
+  }
 }
 
 class _Seccion extends StatelessWidget {

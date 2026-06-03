@@ -15,6 +15,19 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
+  // Pantalla completa: ocultar barra de estado y navegación (tablets iOS/Android)
+  if (!kIsWeb) {
+    await SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+    SystemChrome.setSystemUIOverlayStyle(
+      const SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: Brightness.light,
+        systemNavigationBarColor: Color(0xFF1E3A5F),
+        systemNavigationBarIconBrightness: Brightness.light,
+      ),
+    );
+  }
+
   // Inicializar datos de localización para fechas en español
   await initializeDateFormatting('es', null);
 
@@ -52,6 +65,11 @@ class MainApp extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // Reafirmar pantalla completa (immersiveSticky se reactiva tras gestos).
+    if (!kIsWeb) {
+      SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+    }
+
     final goRouter = ref.watch(goRouterProvider);
 
     return MaterialApp.router(

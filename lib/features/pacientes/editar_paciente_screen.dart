@@ -40,7 +40,7 @@ class _EditarPacienteScreenState extends ConsumerState<EditarPacienteScreen> {
   final _direccionCtrl = TextEditingController();
   final _ciudadCtrl = TextEditingController();
   String _genero = 'Femenino';
-  String _tipoId = 'cédula';
+  String _tipoId = 'DPI';
   String _estado = 'activo';
   DateTime? _fechaNac;
   int _edad = 0;
@@ -54,6 +54,17 @@ class _EditarPacienteScreenState extends ConsumerState<EditarPacienteScreen> {
 
   late Paciente _pacienteOriginal;
 
+  /// Normaliza el tipo guardado a un valor presente en el dropdown
+  /// (['DPI','pasaporte','otro']) para evitar el assertion de DropdownButton.
+  String _normalizarTipoId(String? t) {
+    if (t == null || t.trim().isEmpty) return 'DPI';
+    final low = t.toLowerCase();
+    if (low == 'cedula' || low == 'cédula' || low == 'dpi') return 'DPI';
+    if (low == 'pasaporte') return 'pasaporte';
+    if (low == 'otro') return 'otro';
+    return 'DPI';
+  }
+
   void _cargarDatos(Paciente p) {
     if (_cargado) return;
     _pacienteOriginal = p;
@@ -64,7 +75,7 @@ class _EditarPacienteScreenState extends ConsumerState<EditarPacienteScreen> {
     _direccionCtrl.text = p.direccion;
     _ciudadCtrl.text = p.ciudad;
     _genero = p.genero.isEmpty ? 'Femenino' : p.genero;
-    _tipoId = p.tipoIdentificacion.isEmpty ? 'cédula' : p.tipoIdentificacion;
+    _tipoId = _normalizarTipoId(p.tipoIdentificacion);
     _estado = p.estado;
     _alergiasCtrl.text = p.alergias;
     _condicionesCtrl.text = p.condicionesPreexistentes;
@@ -526,7 +537,7 @@ class _EditarPacienteScreenState extends ConsumerState<EditarPacienteScreen> {
                         right: _DropdownField(
                           label: 'Tipo Identificación',
                           value: _tipoId,
-                          items: const ['cédula', 'pasaporte', 'otro'],
+                          items: const ['DPI', 'pasaporte', 'otro'],
                           onChanged: (v) => setState(() => _tipoId = v!),
                         ),
                       ),

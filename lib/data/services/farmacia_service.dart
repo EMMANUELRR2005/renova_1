@@ -29,6 +29,8 @@ class Medicamento {
   // Fechas
   final String fechaVencimiento;
   final DateTime? fechaIngreso;
+  // Foto del producto
+  final String fotoUrl;
   // Auditoría
   final String creadoPor;
   final String nombreCreador;
@@ -55,6 +57,7 @@ class Medicamento {
     this.requiereReceta = false,
     this.fechaVencimiento = '',
     this.fechaIngreso,
+    this.fotoUrl = '',
     this.creadoPor = '',
     this.nombreCreador = '',
     this.ultimaActualizacion,
@@ -85,6 +88,7 @@ class Medicamento {
         'precioVenta': precioVenta,
         'requiereReceta': requiereReceta,
         'fechaVencimiento': fechaVencimiento,
+        'fotoUrl': fotoUrl,
       };
 
   factory Medicamento.fromMap(Map<String, dynamic> map, String docId) {
@@ -117,6 +121,7 @@ class Medicamento {
       requiereReceta: map['requiereReceta'] ?? false,
       fechaVencimiento: map['fechaVencimiento'] ?? '',
       fechaIngreso: parseFecha(map['fechaIngreso']),
+      fotoUrl: map['fotoUrl'] ?? '',
       creadoPor: map['creadoPor'] ?? '',
       nombreCreador: map['nombreCreador'] ?? '',
       ultimaActualizacion: parseFecha(map['ultimaActualizacion']),
@@ -263,6 +268,36 @@ class FarmaciaService {
 
   Future<void> eliminarMedicamento(String id) async {
     await _db.collection('medicamentos').doc(id).delete();
+  }
+
+  /// Actualiza solo la URL de la foto del medicamento.
+  Future<void> actualizarFotoMedicamento(String id, String url) async {
+    await _db.collection('medicamentos').doc(id).update({'fotoUrl': url});
+  }
+
+  /// Elimina un medicamento vencido y registra el movimiento de eliminación
+  /// (auditoría) en una sola operación.
+  Future<void> eliminarMedicamentoVencido(
+    Medicamento med, {
+    required String uid,
+    required String nombreResponsable,
+  }) async {
+    await _db.collection('medicamentos').doc(med.id).delete();
+    final movRef = _db.collection('movimientos_farmacia').doc();
+    await movRef.set({
+      'id': movRef.id,
+      'tipo': 'eliminacion_vencido',
+      'medicamentoId': med.id,
+      'nombreMedicamento': med.nombre,
+      'cantidad': med.cantidad,
+      'cantidadAnterior': med.cantidad,
+      'cantidadNueva': 0,
+      'motivo': 'Eliminado por vencimiento (${med.fechaVencimiento})',
+      'ventaId': '',
+      'realizadoPor': uid,
+      'nombreResponsable': nombreResponsable,
+      'fecha': FieldValue.serverTimestamp(),
+    });
   }
 
   /// Registra un movimiento de inventario (auditoría) sin tocar el stock.

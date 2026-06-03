@@ -751,7 +751,9 @@ class _FormularioNuevaCitaState extends ConsumerState<_FormularioNuevaCita> {
                                   color: AppColors.textSecondary)),
                           const SizedBox(height: 6),
                           DropdownButtonFormField<String>(
-                            value: _servicioId,
+                            value: servicios.any((s) => s.id == _servicioId)
+                                ? _servicioId
+                                : null,
                             decoration: const InputDecoration(
                               hintText: 'Seleccionar',
                             ),
@@ -791,7 +793,9 @@ class _FormularioNuevaCitaState extends ConsumerState<_FormularioNuevaCita> {
                                   color: AppColors.textSecondary)),
                           const SizedBox(height: 6),
                           DropdownButtonFormField<String>(
-                            value: _clinicaId,
+                            value: clinicas.any((c) => c.id == _clinicaId)
+                                ? _clinicaId
+                                : null,
                             decoration: const InputDecoration(
                               hintText: 'Seleccionar',
                             ),
@@ -834,7 +838,9 @@ class _FormularioNuevaCitaState extends ConsumerState<_FormularioNuevaCita> {
                             color: AppColors.textSecondary)),
                     const SizedBox(height: 6),
                     DropdownButtonFormField<String>(
-                      value: _doctoraId,
+                      value: doctoras.any((d) => d.id == _doctoraId)
+                          ? _doctoraId
+                          : null,
                       decoration: const InputDecoration(
                         hintText: 'Seleccionar (opcional)',
                       ),

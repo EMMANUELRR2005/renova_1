@@ -915,8 +915,10 @@ class _NuevoCobroDialogState extends ConsumerState<_NuevoCobroDialog> {
       final medicamentos = await FarmaciaService().getMedicamentos();
       if (mounted) {
         setState(() {
-          _servicios = servicios;
-          _clinicas = clinicas;
+          // Eliminar duplicados por id para evitar el assertion de Dropdown
+          // ('exactly one item with value').
+          _servicios = _dedupPorId(servicios, (s) => s.id);
+          _clinicas = _dedupPorId(clinicas, (c) => c.id);
           _todosMedicamentos = medicamentos;
           _cargandoCatalogos = false;
         });
@@ -926,6 +928,16 @@ class _NuevoCobroDialogState extends ConsumerState<_NuevoCobroDialog> {
         setState(() => _cargandoCatalogos = false);
       }
     }
+  }
+
+  /// Devuelve la lista sin elementos con id repetido (conserva el primero).
+  List<T> _dedupPorId<T>(List<T> items, String Function(T) id) {
+    final vistos = <String>{};
+    final out = <T>[];
+    for (final it in items) {
+      if (vistos.add(id(it))) out.add(it);
+    }
+    return out;
   }
 
   // ── Medicamentos en el cobro ────────────────────────────────────────────
@@ -1361,7 +1373,8 @@ class _NuevoCobroDialogState extends ConsumerState<_NuevoCobroDialog> {
         const SizedBox(height: 16),
 
         DropdownButtonFormField<String>(
-          value: _clinicaId,
+          // Solo usar el value si existe en la lista (evita el assertion).
+          value: _clinicas.any((c) => c.id == _clinicaId) ? _clinicaId : null,
           decoration: const InputDecoration(
             labelText: 'Clínica *',
             border: OutlineInputBorder(),
@@ -1447,7 +1460,10 @@ class _NuevoCobroDialogState extends ConsumerState<_NuevoCobroDialog> {
                 Expanded(
                   flex: 3,
                   child: DropdownButtonFormField<String>(
-                    value: item.servicioId.isEmpty ? null : item.servicioId,
+                    // Solo usar el value si existe en la lista de servicios.
+                    value: _servicios.any((s) => s.id == item.servicioId)
+                        ? item.servicioId
+                        : null,
                     decoration: const InputDecoration(
                       labelText: 'Servicio *',
                       border: OutlineInputBorder(),

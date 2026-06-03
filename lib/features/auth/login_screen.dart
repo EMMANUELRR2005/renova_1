@@ -21,6 +21,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   late TextEditingController _emailController;
   late TextEditingController _passwordController;
   bool _isLoading = false;
+  bool _emailError = false;
+  bool _passwordError = false;
 
   @override
   void initState() {
@@ -42,7 +44,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       return;
     }
 
-    setState(() => _isLoading = true);
+    setState(() {
+      _isLoading = true;
+      _emailError = false;
+      _passwordError = false;
+    });
 
     try {
       final result = await ref
@@ -72,7 +78,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     } on FirebaseAuthException catch (e) {
       if (mounted) {
         setState(() => _isLoading = false);
-        _showError(_mapAuthError(e.code));
+        _mostrarErrorAuth(e.code);
       }
     } on FirebaseException catch (e) {
       // Firestore errors: unavailable, permission-denied, etc.
@@ -107,25 +113,79 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     }
   }
 
-  String _mapAuthError(String code) {
+  /// Muestra un mensaje específico según el código de error y resalta el campo
+  /// que corresponda (email o contraseña).
+  void _mostrarErrorAuth(String code) {
+    String mensaje;
+    Color color;
+    IconData icono;
+    bool emailErr = false;
+    bool passErr = false;
+
     switch (code) {
       case 'user-not-found':
-        return 'No existe una cuenta con ese email.';
-      case 'wrong-password':
-        return 'Contraseña incorrecta.';
-      case 'invalid-credential':
-        return 'Email o contraseña incorrectos.';
       case 'invalid-email':
-        return 'El formato del email no es válido.';
+        mensaje = '❌ El correo electrónico no está registrado en el sistema. '
+            'Verifica que sea correcto.';
+        color = AppColors.danger;
+        icono = Icons.email_outlined;
+        emailErr = true;
+        break;
+      case 'wrong-password':
+      case 'invalid-credential':
+        mensaje = '❌ La contraseña es incorrecta. '
+            'Verifica que estés escribiendo bien tu contraseña.';
+        color = AppColors.danger;
+        icono = Icons.lock_outline;
+        passErr = true;
+        break;
       case 'user-disabled':
-        return 'Esta cuenta está deshabilitada.';
+        mensaje = '⛔ Esta cuenta está deshabilitada. '
+            'Contacta al administrador para rehabilitarla.';
+        color = AppColors.warning;
+        icono = Icons.block;
+        break;
       case 'too-many-requests':
-        return 'Demasiados intentos. Intenta más tarde.';
+        mensaje = '⚠️ Demasiados intentos fallidos. Tu cuenta está bloqueada '
+            'temporalmente. Intenta de nuevo en unos minutos.';
+        color = AppColors.warning;
+        icono = Icons.timer_outlined;
+        break;
       case 'network-request-failed':
-        return 'Sin conexión a internet.';
+        mensaje = '📶 Sin conexión a internet. '
+            'Verifica tu red e intenta de nuevo.';
+        color = AppColors.primary;
+        icono = Icons.wifi_off;
+        break;
       default:
-        return 'Error de autenticación ($code).';
+        mensaje = '❌ Error al iniciar sesión. '
+            'Verifica tu correo y contraseña.';
+        color = AppColors.danger;
+        icono = Icons.error_outline;
+        emailErr = true;
+        passErr = true;
     }
+
+    setState(() {
+      _emailError = emailErr;
+      _passwordError = passErr;
+    });
+
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            Icon(icono, color: Colors.white),
+            const SizedBox(width: 8),
+            Expanded(child: Text(mensaje)),
+          ],
+        ),
+        backgroundColor: color,
+        duration: const Duration(seconds: 5),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
   }
 
   String _getRutaInicial(RolUsuario rol) {
@@ -272,6 +332,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         controller: _emailController,
                         icon: '✉️',
                         keyboardType: TextInputType.emailAddress,
+                        hasError: _emailError,
+                        errorText:
+                            _emailError ? 'Correo no registrado' : null,
+                        onChanged: (_) {
+                          if (_emailError) {
+                            setState(() => _emailError = false);
+                          }
+                        },
                       ),
                       const SizedBox(height: 20),
                       // Contraseña
@@ -281,6 +349,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         controller: _passwordController,
                         icon: '🔒',
                         obscureText: true,
+                        hasError: _passwordError,
+                        errorText:
+                            _passwordError ? 'Contraseña incorrecta' : null,
+                        onChanged: (_) {
+                          if (_passwordError) {
+                            setState(() => _passwordError = false);
+                          }
+                        },
                       ),
                       const SizedBox(height: 32),
                       // Botón login

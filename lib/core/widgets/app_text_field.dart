@@ -11,6 +11,8 @@ class AppTextField extends StatefulWidget {
   final TextInputType keyboardType;
   final String? Function(String?)? validator;
   final ValueChanged<String>? onChanged;
+  final bool hasError;
+  final String? errorText;
 
   const AppTextField({
     Key? key,
@@ -22,6 +24,8 @@ class AppTextField extends StatefulWidget {
     this.keyboardType = TextInputType.text,
     this.validator,
     this.onChanged,
+    this.hasError = false,
+    this.errorText,
   }) : super(key: key);
 
   @override
@@ -53,6 +57,19 @@ class _AppTextFieldState extends State<AppTextField> {
       decoration: InputDecoration(
         label: Text(widget.label),
         hintText: widget.hintText,
+        errorText: widget.errorText,
+        enabledBorder: widget.hasError
+            ? OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: const BorderSide(color: AppColors.danger),
+              )
+            : null,
+        focusedBorder: widget.hasError
+            ? OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: const BorderSide(color: AppColors.danger, width: 2),
+              )
+            : null,
         prefixIcon: Padding(
           padding: const EdgeInsets.only(left: 12, right: 8),
           child: Text(widget.icon, style: const TextStyle(fontSize: 18)),

@@ -369,19 +369,22 @@ final movimientosFarmaciaStreamProvider =
 
 /// Resultado de la verificación de alertas de inventario.
 class AlertasFarmacia {
-  /// Medicamentos próximos a vencer (<= 30 días). Cada entrada incluye los
-  /// días restantes en [diasParaVencer].
+  /// Medicamentos próximos a vencer (entre 0 y 30 días).
   final List<Medicamento> porVencer;
+  /// Medicamentos cuya fecha de vencimiento ya pasó (días < 0).
+  final List<Medicamento> vencidos;
   final List<Medicamento> stockBajo;
   final List<Medicamento> sinStock;
 
   const AlertasFarmacia({
     this.porVencer = const [],
+    this.vencidos = const [],
     this.stockBajo = const [],
     this.sinStock = const [],
   });
 
-  int get total => porVencer.length + stockBajo.length + sinStock.length;
+  int get total =>
+      porVencer.length + vencidos.length + stockBajo.length + sinStock.length;
   bool get hayAlertas => total > 0;
 }
 
@@ -405,6 +408,7 @@ final alertasFarmaciaProvider = Provider<AlertasFarmacia>((ref) {
   if (meds == null) return const AlertasFarmacia();
 
   final porVencer = <Medicamento>[];
+  final vencidos = <Medicamento>[];
   final stockBajo = <Medicamento>[];
   final sinStock = <Medicamento>[];
 
@@ -415,16 +419,24 @@ final alertasFarmaciaProvider = Provider<AlertasFarmacia>((ref) {
       stockBajo.add(m);
     }
     final dias = diasParaVencer(m);
-    if (dias != null && dias <= 30) {
-      porVencer.add(m);
+    if (dias != null) {
+      if (dias < 0) {
+        vencidos.add(m);
+      } else if (dias <= 30) {
+        porVencer.add(m);
+      }
     }
   }
 
   porVencer.sort((a, b) => (diasParaVencer(a) ?? 9999)
       .compareTo(diasParaVencer(b) ?? 9999));
+  // Vencidos: el más vencido (más negativo) primero.
+  vencidos.sort((a, b) =>
+      (diasParaVencer(a) ?? 0).compareTo(diasParaVencer(b) ?? 0));
 
   return AlertasFarmacia(
     porVencer: porVencer,
+    vencidos: vencidos,
     stockBajo: stockBajo,
     sinStock: sinStock,
   );

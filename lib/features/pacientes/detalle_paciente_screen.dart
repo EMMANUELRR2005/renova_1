@@ -190,7 +190,9 @@ class DetallePacienteScreen extends ConsumerWidget {
                           _InfoCard(
                             title: 'Identificación',
                             rows: [
-                              _InfoRow('Tipo', paciente.tipoIdentificacion),
+                              _InfoRow('Tipo',
+                                  displayTipoIdentificacion(
+                                      paciente.tipoIdentificacion)),
                               _InfoRow('Número', paciente.numeroIdentificacion),
                             ],
                           ),

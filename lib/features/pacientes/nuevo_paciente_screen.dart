@@ -1,6 +1,5 @@
 import 'dart:typed_data';
 
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -39,7 +38,7 @@ class _NuevoPacienteScreenState extends ConsumerState<NuevoPacienteScreen> {
   final _direccionCtrl = TextEditingController();
   final _ciudadCtrl = TextEditingController();
   String _genero = 'Femenino';
-  String _tipoId = 'cédula';
+  String _tipoId = 'DPI';
   DateTime? _fechaNac;
   int _edad = 0;
 
@@ -196,7 +195,7 @@ class _NuevoPacienteScreenState extends ConsumerState<NuevoPacienteScreen> {
     return Column(
       children: [
         GestureDetector(
-          onTap: () => _tomarFoto(ImageSource.gallery),
+          onTap: () => _tomarFoto(ImageSource.camera),
           child: Container(
             width: 120,
             height: 120,
@@ -237,28 +236,16 @@ class _NuevoPacienteScreenState extends ConsumerState<NuevoPacienteScreen> {
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            if (!kIsWeb) ...[
-              OutlinedButton.icon(
-                onPressed: () => _tomarFoto(ImageSource.camera),
-                icon: const Icon(Icons.camera_alt_outlined, size: 18),
-                label: const Text('Cámara'),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: AppColors.primary,
-                  side: const BorderSide(color: AppColors.primary),
-                ),
-              ),
-              const SizedBox(width: 12),
-            ],
+            // Solo cámara: la foto del paciente se toma en el momento.
             OutlinedButton.icon(
-              onPressed: () => _tomarFoto(ImageSource.gallery),
-              icon: Icon(
-                kIsWeb ? Icons.upload_file_outlined : Icons.photo_library_outlined,
-                size: 18,
-              ),
-              label: Text(kIsWeb ? 'Subir Foto' : 'Galería'),
+              onPressed: () => _tomarFoto(ImageSource.camera),
+              icon: const Icon(Icons.camera_alt_outlined, size: 20),
+              label: const Text('Tomar Foto'),
               style: OutlinedButton.styleFrom(
                 foregroundColor: AppColors.primary,
                 side: const BorderSide(color: AppColors.primary),
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 24, vertical: 12),
               ),
             ),
             if (_fotoBytes != null) ...[
@@ -522,14 +509,14 @@ class _NuevoPacienteScreenState extends ConsumerState<NuevoPacienteScreen> {
                   ),
                   _Row2(
                     left: _Field(
-                      label: 'Número de Identificación *',
+                      label: 'Número de DPI *',
                       controller: _numIdCtrl,
                       validator: _requerido,
                     ),
                     right: _Dropdown(
                       label: 'Tipo de Identificación *',
                       value: _tipoId,
-                      items: const ['cédula', 'pasaporte', 'otro'],
+                      items: const ['DPI', 'pasaporte', 'otro'],
                       onChanged: (v) => setState(() => _tipoId = v!),
                     ),
                   ),

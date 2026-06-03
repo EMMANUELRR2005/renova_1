@@ -1,8 +1,13 @@
+import 'dart:typed_data';
+
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../../core/auth/permisos.dart';
 import '../../core/theme/app_theme.dart';
@@ -312,6 +317,26 @@ class _MedicamentoCard extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Foto del producto
+          Container(
+            width: 48,
+            height: 48,
+            margin: const EdgeInsets.only(right: 12),
+            decoration: BoxDecoration(
+              color: Colors.grey[200],
+              borderRadius: BorderRadius.circular(8),
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: med.fotoUrl.isNotEmpty
+                ? CachedNetworkImage(
+                    imageUrl: med.fotoUrl,
+                    fit: BoxFit.cover,
+                    errorWidget: (_, __, ___) => const Icon(
+                        Icons.medication,
+                        color: Colors.grey, size: 24),
+                  )
+                : const Icon(Icons.medication, color: Colors.grey, size: 24),
+          ),
           // Códigos
           SizedBox(
             width: 110,
@@ -546,6 +571,10 @@ class _FormularioMedicamentoDialogState
   bool _requiereReceta = false;
   bool _guardando = false;
 
+  // Foto del producto
+  Uint8List? _fotoMedBytes;
+  String? _fotoMedUrl;
+
   bool _esAdmin = false;
   bool _esFarmaceutica = false;
   int _cantidadActual = 0;
@@ -581,6 +610,7 @@ class _FormularioMedicamentoDialogState
       _categoria = _categorias.contains(m.categoria) ? m.categoria : 'Otro';
       _unidad = _unidades.contains(m.unidad) ? m.unidad : 'tabletas';
       _requiereReceta = m.requiereReceta;
+      _fotoMedUrl = m.fotoUrl.isEmpty ? null : m.fotoUrl;
     } else {
       _generarCodigoInterno();
     }
@@ -641,6 +671,8 @@ class _FormularioMedicamentoDialogState
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      _buildSeccionFotoMedicamento(),
+                      const SizedBox(height: 16),
                       _seccion('Identificación'),
                       _row2(
                         _campo('Nombre *', _nombreCtrl,
@@ -755,6 +787,136 @@ class _FormularioMedicamentoDialogState
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  // ── Foto del medicamento ────────────────────────────────────────────────
+
+  Future<void> _seleccionarFoto(ImageSource source) async {
+    try {
+      final picker = ImagePicker();
+      final picked = await picker.pickImage(
+        source: source,
+        maxWidth: 800,
+        maxHeight: 800,
+        imageQuality: 85,
+      );
+      if (picked != null) {
+        final bytes = await picked.readAsBytes();
+        if (mounted) setState(() => _fotoMedBytes = bytes);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error al acceder: $e'),
+            backgroundColor: AppColors.danger,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<String?> _subirFotoMedicamento(String medicamentoId) async {
+    if (_fotoMedBytes == null) return _fotoMedUrl;
+    try {
+      final ref = FirebaseStorage.instance
+          .ref()
+          .child('fotos_medicamentos')
+          .child('$medicamentoId.jpg');
+      final task = await ref.putData(
+        _fotoMedBytes!,
+        SettableMetadata(contentType: 'image/jpeg'),
+      );
+      return await task.ref.getDownloadURL();
+    } catch (e) {
+      // No bloquear el guardado si falla la subida.
+      debugPrint('⚠️ Error subiendo foto medicamento: $e');
+      return _fotoMedUrl;
+    }
+  }
+
+  Widget _buildSeccionFotoMedicamento() {
+    return Center(
+      child: Column(
+        children: [
+          GestureDetector(
+            onTap: () => _seleccionarFoto(ImageSource.camera),
+            child: Container(
+              width: 130,
+              height: 130,
+              decoration: BoxDecoration(
+                color: Colors.grey[100],
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppColors.primary, width: 2),
+              ),
+              child: _fotoMedBytes != null
+                  ? ClipRRect(
+                      borderRadius: BorderRadius.circular(10),
+                      child: Image.memory(_fotoMedBytes!, fit: BoxFit.cover),
+                    )
+                  : (_fotoMedUrl != null && _fotoMedUrl!.isNotEmpty)
+                      ? ClipRRect(
+                          borderRadius: BorderRadius.circular(10),
+                          child: CachedNetworkImage(
+                            imageUrl: _fotoMedUrl!,
+                            fit: BoxFit.cover,
+                            errorWidget: (_, __, ___) => const Icon(
+                                Icons.medication,
+                                size: 48,
+                                color: Colors.grey),
+                          ),
+                        )
+                      : const Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.medication,
+                                size: 44, color: Colors.grey),
+                            SizedBox(height: 6),
+                            Text('Foto del producto',
+                                style: TextStyle(
+                                    color: Colors.grey, fontSize: 12)),
+                          ],
+                        ),
+            ),
+          ),
+          const SizedBox(height: 10),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              OutlinedButton.icon(
+                onPressed: () => _seleccionarFoto(ImageSource.camera),
+                icon: const Icon(Icons.camera_alt_outlined, size: 18),
+                label: const Text('Cámara'),
+                style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.primary),
+              ),
+              const SizedBox(width: 8),
+              OutlinedButton.icon(
+                onPressed: () => _seleccionarFoto(ImageSource.gallery),
+                icon: const Icon(Icons.photo_library_outlined, size: 18),
+                label: const Text('Galería'),
+                style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.primary),
+              ),
+              if (_fotoMedBytes != null ||
+                  (_fotoMedUrl != null && _fotoMedUrl!.isNotEmpty)) ...[
+                const SizedBox(width: 8),
+                OutlinedButton.icon(
+                  onPressed: () => setState(() {
+                    _fotoMedBytes = null;
+                    _fotoMedUrl = null;
+                  }),
+                  icon: const Icon(Icons.delete_outline, size: 18),
+                  label: const Text('Quitar'),
+                  style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.danger),
+                ),
+              ],
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -947,6 +1109,12 @@ class _FormularioMedicamentoDialogState
         return;
       }
 
+      // En edición ya conocemos el id: resolvemos la foto antes de guardar.
+      String fotoUrl = _fotoMedUrl ?? '';
+      if (_esEdicion) {
+        fotoUrl = await _subirFotoMedicamento(widget.medicamento!.id) ?? '';
+      }
+
       final med = Medicamento(
         id: widget.medicamento?.id ?? '',
         nombre: _nombreCtrl.text.trim(),
@@ -966,6 +1134,7 @@ class _FormularioMedicamentoDialogState
         precioVenta: double.tryParse(_precioVentaCtrl.text.trim()) ?? 0,
         requiereReceta: _requiereReceta,
         fechaVencimiento: _vencimientoCtrl.text.trim(),
+        fotoUrl: fotoUrl,
       );
 
       if (_esEdicion) {
@@ -988,8 +1157,15 @@ class _FormularioMedicamentoDialogState
           );
         }
       } else {
-        await service.crearMedicamento(med,
+        final nuevoId = await service.crearMedicamento(med,
             uid: usuario?.id ?? '', nombreCreador: usuario?.nombre ?? '');
+        // Subir foto (si hay) usando el id real y actualizar el documento.
+        if (_fotoMedBytes != null) {
+          final url = await _subirFotoMedicamento(nuevoId) ?? '';
+          if (url.isNotEmpty) {
+            await service.actualizarFotoMedicamento(nuevoId, url);
+          }
+        }
       }
 
       if (mounted) {

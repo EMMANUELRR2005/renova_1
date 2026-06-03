@@ -46,6 +46,18 @@ enum EstadoCita {
   pendiente,
 }
 
+/// Muestra el tipo de identificación normalizado. Los registros antiguos
+/// guardados como 'cédula'/'cedula' se muestran como 'DPI'.
+String displayTipoIdentificacion(String? tipo) {
+  if (tipo == null || tipo.trim().isEmpty) return 'DPI';
+  final t = tipo.toLowerCase();
+  if (t == 'cedula' || t == 'cédula') return 'DPI';
+  // Capitalizar palabras simples (pasaporte -> Pasaporte).
+  if (t == 'pasaporte') return 'Pasaporte';
+  if (t == 'otro') return 'Otro';
+  return tipo;
+}
+
 // ============================================================================
 // MODELOS - SERVICIOS Y CLÍNICAS
 // ============================================================================
@@ -734,7 +746,7 @@ class Paciente {
       direccion: map['direccion'] ?? '',
       ciudad: map['ciudad'] ?? '',
       numeroIdentificacion: map['numeroIdentificacion'] ?? map['dpi'] ?? '',
-      tipoIdentificacion: map['tipoIdentificacion'] ?? 'cédula',
+      tipoIdentificacion: map['tipoIdentificacion'] ?? 'DPI',
       alergias: map['alergias'] is String
           ? map['alergias']
           : (map['alergias'] as List?)?.join(', ') ?? '',
