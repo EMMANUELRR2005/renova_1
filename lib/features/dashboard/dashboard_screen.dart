@@ -7,10 +7,21 @@ import 'package:intl/intl.dart';
 
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/app_shell.dart';
-import '../../data/mock/providers.dart';
-import '../../data/services/venta_service.dart';
-import '../../data/services/cita_service.dart';
-import '../../data/services/paciente_service.dart';
+import '../../data/services/reporte_service.dart';
+
+const _meses = [
+  'Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun',
+  'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'
+];
+const _dorado = Color(0xFFC9A96E);
+const _paleta = [
+  Color(0xFF1E3A5F),
+  _dorado,
+  Color(0xFF3B82F6),
+  Color(0xFF10B981),
+  Color(0xFFF59E0B),
+  Color(0xFF8B5CF6),
+];
 
 class DashboardScreen extends ConsumerStatefulWidget {
   const DashboardScreen({super.key});
@@ -22,76 +33,67 @@ class DashboardScreen extends ConsumerStatefulWidget {
 class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   String _periodo = 'mes';
   bool _cargando = true;
-
-  Map<String, dynamic> _resumenHoy = {};
-  Map<String, dynamic> _resumenMes = {};
-  List<Map<String, dynamic>> _ingresos6Meses = [];
-  Map<String, int> _serviciosMes = {};
-  Map<String, double> _metodosPago = {};
-  List<Venta> _ultimasVentas = [];
-  List<dynamic> _citasHoy = [];
-  int _pacientesTotales = 0;
-  int _pacientesNuevosMes = 0;
+  Map<String, dynamic> _clinica = {};
+  Map<String, dynamic> _farmacia = {};
 
   @override
   void initState() {
     super.initState();
-    _cargarDatos();
+    _cargar();
   }
 
-  Future<void> _cargarDatos() async {
+  ({DateTime desde, DateTime hasta}) _rango() {
+    final hoy = DateTime.now();
+    switch (_periodo) {
+      case 'hoy':
+        final d = DateTime(hoy.year, hoy.month, hoy.day);
+        return (desde: d, hasta: d.add(const Duration(days: 1)));
+      case 'semana':
+        var d = hoy.subtract(Duration(days: hoy.weekday - 1));
+        d = DateTime(d.year, d.month, d.day);
+        return (desde: d, hasta: d.add(const Duration(days: 7)));
+      case 'anio':
+        return (desde: DateTime(hoy.year, 1, 1), hasta: DateTime(hoy.year + 1, 1, 1));
+      case 'mes':
+      default:
+        return (
+          desde: DateTime(hoy.year, hoy.month, 1),
+          hasta: DateTime(hoy.year, hoy.month + 1, 1)
+        );
+    }
+  }
+
+  String get _labelPeriodo {
+    switch (_periodo) {
+      case 'hoy':
+        return 'Hoy';
+      case 'semana':
+        return 'Esta semana';
+      case 'anio':
+        return 'Este año';
+      default:
+        return 'Este mes';
+    }
+  }
+
+  Future<void> _cargar() async {
     setState(() => _cargando = true);
     try {
-      final ventaService = VentaService();
-      final citaService = CitaService();
-      final pacienteService = PacienteService();
-
-      final citasHoyStream = await citaService.streamCitasMedicasHoy().first;
-
-      final results = await Future.wait([
-        ventaService.getResumenHoy(),
-        ventaService.getResumenMes(),
-        ventaService.getIngresosUltimos6Meses(),
-        ventaService.getServiciosPorMes(),
-        ventaService.getMetodosPagoMes(),
-        pacienteService.contarPacientesActivos(),
-        pacienteService.contarPacientesNuevosMes(),
+      final r = _rango();
+      final service = ReporteService();
+      final res = await Future.wait([
+        service.getReporteClinica(desde: r.desde, hasta: r.hasta),
+        service.getReporteFarmacia(desde: r.desde, hasta: r.hasta),
       ]);
-
-      final ventasStream = await ventaService.streamTodasLasVentas().first;
-
-      // Logs de diagnóstico
-      print('═══ DIAGNÓSTICO DASHBOARD ═══');
-      print('📊 Resumen Hoy: ${results[0]}');
-      print('📊 Resumen Mes: ${results[1]}');
-      print('📊 Ingresos 6 meses: ${results[2]}');
-      print('📊 Servicios mes: ${results[3]}');
-      print('📊 Métodos pago: ${results[4]}');
-      print('👥 Pacientes activos: ${results[5]}');
-      print('👥 Pacientes nuevos mes: ${results[6]}');
-      print('📅 Citas hoy: ${citasHoyStream.length}');
-      print('💰 Ventas totales: ${ventasStream.length}');
-      print('═══════════════════════════════');
-
       if (mounted) {
         setState(() {
-          _resumenHoy = results[0] as Map<String, dynamic>;
-          _resumenMes = results[1] as Map<String, dynamic>;
-          _ingresos6Meses = results[2] as List<Map<String, dynamic>>;
-          _serviciosMes = results[3] as Map<String, int>;
-          _metodosPago = results[4] as Map<String, double>;
-          _pacientesTotales = results[5] as int;
-          _pacientesNuevosMes = results[6] as int;
-          _citasHoy = citasHoyStream;
-          _ultimasVentas = ventasStream.take(5).toList();
+          _clinica = res[0];
+          _farmacia = res[1];
           _cargando = false;
         });
       }
     } catch (e) {
-      print('❌ ERROR DASHBOARD: $e');
-      if (mounted) {
-        setState(() => _cargando = false);
-      }
+      if (mounted) setState(() => _cargando = false);
     }
   }
 
@@ -99,833 +101,587 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   Widget build(BuildContext context) {
     return AppShell(
       selectedIndex: 0,
-      onNavigate: (index) {},
-      child: _cargando
-          ? const Center(child: CircularProgressIndicator())
-          : RefreshIndicator(
-              onRefresh: _cargarDatos,
-              child: SingleChildScrollView(
-                physics: const AlwaysScrollableScrollPhysics(),
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildHeader(),
-                    const SizedBox(height: 20),
-                    _buildBannerAlertas(),
-                    _buildKPICards(),
-                    const SizedBox(height: 24),
-                    _buildChartsRow(),
-                    const SizedBox(height: 24),
-                    _buildBottomRow(),
-                  ],
-                ),
-              ),
+      onNavigate: (_) {},
+      child: DefaultTabController(
+        length: 2,
+        child: Column(
+          children: [
+            _buildHeader(),
+            _buildTabs(),
+            const SizedBox(height: 12),
+            Expanded(
+              child: _cargando
+                  ? const Center(child: CircularProgressIndicator())
+                  : TabBarView(
+                      children: [
+                        _buildTabClinica(),
+                        _buildTabFarmacia(),
+                      ],
+                    ),
             ),
+          ],
+        ),
+      ),
     );
   }
 
   Widget _buildHeader() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Dashboard',
-              style: TextStyle(
-                fontSize: 22,
-                fontWeight: FontWeight.bold,
-                color: AppColors.textPrimary,
-                fontFamily: GoogleFonts.dmSans().fontFamily,
-              ),
-            ),
-            Text(
-              DateFormat('EEEE, d MMMM yyyy', 'es').format(DateTime.now()),
-              style: TextStyle(
-                fontSize: 13,
-                color: AppColors.textSecondary,
-                fontFamily: GoogleFonts.dmSans().fontFamily,
-              ),
-            ),
-          ],
-        ),
-        Row(
-          children: [
-            _buildPeriodoButton('hoy', 'Hoy'),
-            const SizedBox(width: 8),
-            _buildPeriodoButton('semana', 'Semana'),
-            const SizedBox(width: 8),
-            _buildPeriodoButton('mes', 'Mes'),
-            const SizedBox(width: 8),
-            _buildPeriodoButton('anio', 'Año'),
-          ],
-        ),
-      ],
-    );
-  }
-
-  Widget _buildPeriodoButton(String value, String label) {
-    final seleccionado = _periodo == value;
-    return InkWell(
-      onTap: () => setState(() => _periodo = value),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        decoration: BoxDecoration(
-          color: seleccionado ? AppColors.primary : Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: seleccionado ? AppColors.primary : AppColors.border,
-          ),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.w600,
-            color: seleccionado ? Colors.white : AppColors.textSecondary,
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildBannerAlertas() {
-    final alertas = ref.watch(alertasFarmaciaProvider);
-    if (!alertas.hayAlertas) return const SizedBox.shrink();
-    return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: AppColors.dangerBg,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: AppColors.danger.withValues(alpha: 0.4)),
-      ),
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
       child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          const Icon(Icons.warning_amber, color: AppColors.danger),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              'Hay ${alertas.total} alerta${alertas.total == 1 ? '' : 's'} en el inventario de farmacia '
-              '(${alertas.sinStock.length} sin stock, ${alertas.stockBajo.length} stock bajo, '
-              '${alertas.porVencer.length} por vencer).',
-              style: const TextStyle(color: AppColors.danger),
-            ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Dashboard',
+                  style: TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.textPrimary,
+                    fontFamily: GoogleFonts.dmSans().fontFamily,
+                  )),
+              Text(
+                DateFormat('EEEE, d MMMM yyyy', 'es').format(DateTime.now()),
+                style: const TextStyle(
+                    fontSize: 13, color: AppColors.textSecondary),
+              ),
+            ],
           ),
-          TextButton(
-            onPressed: () => context.go('/farmacia/alertas'),
-            child: const Text('Ver alertas'),
+          Row(
+            children: [
+              for (final p in const [
+                ('hoy', 'Hoy'),
+                ('semana', 'Semana'),
+                ('mes', 'Mes'),
+                ('anio', 'Año'),
+              ])
+                Padding(
+                  padding: const EdgeInsets.only(left: 8),
+                  child: _periodoBtn(p.$1, p.$2),
+                ),
+            ],
           ),
         ],
       ),
     );
   }
 
-  Widget _buildKPICards() {
-    final totalHoy = _resumenHoy['totalCobrado'] ?? 0.0;
-    final totalMes = _resumenMes['total'] ?? 0.0;
-    final transaccionesHoy = _resumenHoy['transacciones'] ?? 0;
-    final citasHoy = _citasHoy.length;
-
-    return Row(
-      children: [
-        Expanded(
-          child: _KPICard(
-            titulo: 'Ingresos Hoy',
-            valor: 'Q ${NumberFormat('#,##0.00').format(totalHoy)}',
-            icono: Icons.attach_money,
-            color: const Color(0xFF10B981),
-            subtitulo: '${transaccionesHoy} transacciones',
-          ),
+  Widget _periodoBtn(String value, String label) {
+    final sel = _periodo == value;
+    return InkWell(
+      onTap: () {
+        setState(() => _periodo = value);
+        _cargar();
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: BoxDecoration(
+          color: sel ? AppColors.primary : Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: sel ? AppColors.primary : AppColors.border),
         ),
-        const SizedBox(width: 16),
-        Expanded(
-          child: _KPICard(
-            titulo: 'Ingresos del Mes',
-            valor: 'Q ${NumberFormat('#,##0.00').format(totalMes)}',
-            icono: Icons.trending_up,
-            color: const Color(0xFF3B82F6),
-            subtitulo: '${_resumenMes['transacciones'] ?? 0} ventas',
-          ),
-        ),
-        const SizedBox(width: 16),
-        Expanded(
-          child: _KPICard(
-            titulo: 'Citas Hoy',
-            valor: '$citasHoy',
-            icono: Icons.calendar_today,
-            color: const Color(0xFF8B5CF6),
-            subtitulo: 'Programadas',
-          ),
-        ),
-        const SizedBox(width: 16),
-        Expanded(
-          child: _KPICard(
-            titulo: 'Pacientes',
-            valor: '$_pacientesTotales',
-            icono: Icons.people,
-            color: const Color(0xFFF59E0B),
-            subtitulo: '+$_pacientesNuevosMes este mes',
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildChartsRow() {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Expanded(
-          flex: 3,
-          child: _buildIngresosMensualesChart(),
-        ),
-        const SizedBox(width: 16),
-        Expanded(
-          flex: 2,
-          child: _buildServiciosPieChart(),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildIngresosMensualesChart() {
-    final meses = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
-
-    double maxY = 1000;
-    for (var data in _ingresos6Meses) {
-      if ((data['total'] as double) > maxY) {
-        maxY = data['total'] as double;
-      }
-    }
-    maxY = (maxY * 1.2).ceilToDouble();
-    if (maxY < 1000) maxY = 1000;
-
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.border),
+        child: Text(label,
+            style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: sel ? Colors.white : AppColors.textSecondary)),
       ),
+    );
+  }
+
+  Widget _buildTabs() {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 20),
+      decoration: BoxDecoration(
+        color: Colors.grey[100],
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: TabBar(
+        indicator: BoxDecoration(
+          color: AppColors.primaryDark,
+          borderRadius: BorderRadius.circular(10),
+        ),
+        indicatorSize: TabBarIndicatorSize.tab,
+        dividerColor: Colors.transparent,
+        labelColor: Colors.white,
+        unselectedLabelColor: AppColors.textSecondary,
+        tabs: const [
+          Tab(
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.local_hospital_outlined, size: 18),
+                SizedBox(width: 6),
+                Text('Clínica'),
+              ],
+            ),
+          ),
+          Tab(
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.medication_outlined, size: 18),
+                SizedBox(width: 6),
+                Text('Farmacia'),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── TAB CLÍNICA ───────────────────────────────────────────────────────────
+
+  Widget _buildTabClinica() {
+    final c = _clinica;
+    final serie = (c['serie6'] as List?)?.cast<double>() ?? List.filled(6, 0.0);
+    final meses6 = (c['meses6'] as List?)?.cast<Map>() ?? [];
+    final serviciosPie = (c['serviciosPie'] as Map?)?.cast<String, int>() ?? {};
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(20),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                'Ingresos Mensuales',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  fontFamily: GoogleFonts.dmSans().fontFamily,
+              _card('Pacientes Totales', '${c['totalPacientes'] ?? 0}',
+                  '+${c['nuevosMes'] ?? 0} este mes', Icons.people_outline,
+                  AppColors.primaryDark),
+              _card('Citas Hoy', '${c['citasHoy'] ?? 0}',
+                  '${c['pendientes'] ?? 0} pendientes ($_labelPeriodo)',
+                  Icons.calendar_today_outlined, const Color(0xFF3B82F6)),
+              _card('Pacientes Activos', '${c['pacientesActivos'] ?? 0}',
+                  '${c['pacientesInactivos'] ?? 0} inactivos',
+                  Icons.person_outline, const Color(0xFF10B981)),
+              _card(
+                  'Ingresos Clínica',
+                  'Q ${NumberFormat('#,##0.00').format(c['ingresos'] ?? 0)}',
+                  _labelPeriodo,
+                  Icons.attach_money,
+                  _dorado,
+                  last: true),
+            ],
+          ),
+          const SizedBox(height: 20),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                flex: 3,
+                child: _chartCard('Ingresos por Servicios', 'Últimos 6 meses',
+                    _barChart(serie, meses6, const Color(0xFF1E3A5F))),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                flex: 2,
+                child: _chartCard('Servicios más solicitados', _labelPeriodo,
+                    _pieFromCounts(serviciosPie)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+          _chartCard(
+            'Citas por estado',
+            _labelPeriodo,
+            _pieCitas(c),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── TAB FARMACIA ──────────────────────────────────────────────────────────
+
+  Widget _buildTabFarmacia() {
+    final f = _farmacia;
+    final vencidos = (f['vencidos'] ?? 0) as int;
+    final stockBajo = (f['stockBajo'] ?? 0) as int;
+    final serie = (f['serie6'] as List?)?.cast<double>() ?? List.filled(6, 0.0);
+    final meses6 = (f['meses6'] as List?)?.cast<Map>() ?? [];
+    final masVendidos =
+        (f['masVendidos'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+    final porCategoria = (f['porCategoria'] as Map?)?.cast<String, int>() ?? {};
+    final stockCritico =
+        (f['stockCritico'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        children: [
+          if (vencidos > 0 || stockBajo > 0)
+            Container(
+              margin: const EdgeInsets.only(bottom: 16),
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppColors.dangerBg,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: AppColors.danger.withValues(alpha: 0.4)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.warning_amber, color: AppColors.danger),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      '⚠️ $vencidos medicamento(s) vencido(s). '
+                      '$stockBajo con stock bajo.',
+                      style: const TextStyle(color: AppColors.danger),
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: () => context.go('/farmacia/alertas'),
+                    child: const Text('Ver alertas'),
+                  ),
+                ],
+              ),
+            ),
+          Row(
+            children: [
+              _card('Total Medicamentos', '${f['totalMedicamentos'] ?? 0}',
+                  '$stockBajo con stock bajo', Icons.medication_outlined,
+                  AppColors.primaryDark),
+              _card(
+                  'Ventas Farmacia',
+                  'Q ${NumberFormat('#,##0.00').format(f['ingresos'] ?? 0)}',
+                  _labelPeriodo,
+                  Icons.point_of_sale_outlined,
+                  _dorado),
+              _card('Unidades Vendidas', '${f['unidadesVendidas'] ?? 0}',
+                  'unidades · $_labelPeriodo', Icons.shopping_bag_outlined,
+                  const Color(0xFF10B981)),
+              _card('Por Vencer', '${f['porVencer'] ?? 0}',
+                  'en los próximos 30 días', Icons.timer_outlined,
+                  AppColors.warning,
+                  last: true),
+            ],
+          ),
+          const SizedBox(height: 20),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                flex: 3,
+                child: _chartCard('Ingresos Farmacia', 'Últimos 6 meses',
+                    _barChart(serie, meses6, _dorado)),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                flex: 2,
+                child: _chartCard('Medicamentos más vendidos', _labelPeriodo,
+                    _pieMasVendidos(masVendidos)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: _chartCard('Inventario por categoría', 'Medicamentos',
+                    _pieFromCounts(porCategoria)),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: _chartCard(
+                  '⚠️ Stock Crítico',
+                  'Bajo el mínimo',
+                  _stockCriticoList(stockCritico),
                 ),
               ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── Helpers UI ──────────────────────────────────────────────────────────
+
+  Widget _card(String titulo, String valor, String sub, IconData icono,
+      Color color,
+      {bool last = false}) {
+    return Expanded(
+      child: Padding(
+        padding: EdgeInsets.only(right: last ? 0 : 16),
+        child: Container(
+          padding: const EdgeInsets.all(18),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: AppColors.border),
+          ),
+          child: Row(
+            children: [
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                width: 44,
+                height: 44,
                 decoration: BoxDecoration(
-                  color: const Color(0xFF10B981).withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(20),
+                  color: color.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(12),
                 ),
-                child: const Row(
+                child: Icon(icono, color: color, size: 22),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Icon(Icons.trending_up, size: 14, color: Color(0xFF10B981)),
-                    SizedBox(width: 4),
-                    Text(
-                      'Últimos 6 meses',
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: Color(0xFF10B981),
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
+                    Text(titulo,
+                        style: const TextStyle(
+                            fontSize: 11, color: AppColors.textSecondary),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis),
+                    const SizedBox(height: 4),
+                    Text(valor,
+                        style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.textPrimary,
+                            fontFamily: GoogleFonts.dmSans().fontFamily)),
+                    const SizedBox(height: 2),
+                    Text(sub,
+                        style: TextStyle(
+                            fontSize: 10,
+                            color: color,
+                            fontWeight: FontWeight.w500),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis),
                   ],
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 24),
-          SizedBox(
-            height: 250,
-            child: BarChart(
-              BarChartData(
-                alignment: BarChartAlignment.spaceAround,
-                maxY: maxY,
-                barTouchData: BarTouchData(
-                  touchTooltipData: BarTouchTooltipData(
-                    getTooltipColor: (_) => AppColors.primary,
-                    getTooltipItem: (group, groupIndex, rod, rodIndex) {
-                      return BarTooltipItem(
-                        'Q ${NumberFormat('#,##0').format(rod.toY)}',
-                        const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-                      );
-                    },
-                  ),
-                ),
-                titlesData: FlTitlesData(
-                  show: true,
-                  bottomTitles: AxisTitles(
-                    sideTitles: SideTitles(
-                      showTitles: true,
-                      getTitlesWidget: (value, meta) {
-                        final index = value.toInt();
-                        if (index >= 0 && index < _ingresos6Meses.length) {
-                          final mes = _ingresos6Meses[index]['mes'] as int;
-                          return Padding(
-                            padding: const EdgeInsets.only(top: 8),
-                            child: Text(
-                              meses[mes - 1],
-                              style: const TextStyle(
-                                fontSize: 11,
-                                color: AppColors.textSecondary,
-                              ),
-                            ),
-                          );
-                        }
-                        return const Text('');
-                      },
-                      reservedSize: 30,
-                    ),
-                  ),
-                  leftTitles: AxisTitles(
-                    sideTitles: SideTitles(
-                      showTitles: true,
-                      reservedSize: 50,
-                      getTitlesWidget: (value, meta) {
-                        return Text(
-                          'Q${NumberFormat.compact().format(value)}',
+        ),
+      ),
+    );
+  }
+
+  Widget _chartCard(String titulo, String subtitulo, Widget child) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(titulo,
+              style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.bold,
+                  fontFamily: GoogleFonts.dmSans().fontFamily)),
+          Text(subtitulo,
+              style:
+                  const TextStyle(fontSize: 11, color: AppColors.textSecondary)),
+          const SizedBox(height: 16),
+          child,
+        ],
+      ),
+    );
+  }
+
+  Widget _barChart(List<double> serie, List<Map> meses6, Color color) {
+    double maxY = 1000;
+    for (final v in serie) {
+      if (v > maxY) maxY = v;
+    }
+    maxY = (maxY * 1.2).ceilToDouble();
+    return SizedBox(
+      height: 240,
+      child: BarChart(
+        BarChartData(
+          alignment: BarChartAlignment.spaceAround,
+          maxY: maxY,
+          barTouchData: BarTouchData(
+            touchTooltipData: BarTouchTooltipData(
+              getTooltipColor: (_) => AppColors.primaryDark,
+              getTooltipItem: (g, gi, rod, ri) => BarTooltipItem(
+                'Q ${NumberFormat('#,##0').format(rod.toY)}',
+                const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ),
+          titlesData: FlTitlesData(
+            bottomTitles: AxisTitles(
+              sideTitles: SideTitles(
+                showTitles: true,
+                reservedSize: 28,
+                getTitlesWidget: (value, meta) {
+                  final i = value.toInt();
+                  if (i >= 0 && i < meses6.length) {
+                    final m = meses6[i]['mes'] as int;
+                    return Padding(
+                      padding: const EdgeInsets.only(top: 6),
+                      child: Text(_meses[m - 1],
                           style: const TextStyle(
-                            fontSize: 10,
-                            color: AppColors.textSecondary,
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                  topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                  rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                ),
-                gridData: FlGridData(
-                  show: true,
-                  drawVerticalLine: false,
-                  horizontalInterval: maxY / 5,
-                  getDrawingHorizontalLine: (value) {
-                    return FlLine(
-                      color: AppColors.border,
-                      strokeWidth: 1,
-                      dashArray: [5, 5],
+                              fontSize: 10, color: AppColors.textSecondary)),
                     );
-                  },
-                ),
-                borderData: FlBorderData(show: false),
-                barGroups: _ingresos6Meses.asMap().entries.map((entry) {
-                  return BarChartGroupData(
-                    x: entry.key,
-                    barRods: [
-                      BarChartRodData(
-                        toY: entry.value['total'] as double,
-                        gradient: const LinearGradient(
-                          colors: [Color(0xFF1E3A5F), Color(0xFF3B82F6)],
-                          begin: Alignment.bottomCenter,
-                          end: Alignment.topCenter,
-                        ),
-                        width: 28,
-                        borderRadius: const BorderRadius.only(
-                          topLeft: Radius.circular(6),
-                          topRight: Radius.circular(6),
-                        ),
-                      ),
-                    ],
-                  );
-                }).toList(),
+                  }
+                  return const Text('');
+                },
               ),
             ),
+            leftTitles: AxisTitles(
+              sideTitles: SideTitles(
+                showTitles: true,
+                reservedSize: 46,
+                getTitlesWidget: (v, m) => Text(
+                  'Q${NumberFormat.compact().format(v)}',
+                  style:
+                      const TextStyle(fontSize: 9, color: AppColors.textSecondary),
+                ),
+              ),
+            ),
+            topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+            rightTitles:
+                const AxisTitles(sideTitles: SideTitles(showTitles: false)),
           ),
-        ],
+          gridData: FlGridData(
+            show: true,
+            drawVerticalLine: false,
+            horizontalInterval: maxY / 5,
+            getDrawingHorizontalLine: (v) =>
+                const FlLine(color: AppColors.border, strokeWidth: 1, dashArray: [5, 5]),
+          ),
+          borderData: FlBorderData(show: false),
+          barGroups: [
+            for (int i = 0; i < serie.length; i++)
+              BarChartGroupData(x: i, barRods: [
+                BarChartRodData(
+                  toY: serie[i],
+                  color: color,
+                  width: 26,
+                  borderRadius: const BorderRadius.vertical(top: Radius.circular(6)),
+                ),
+              ]),
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildServiciosPieChart() {
-    final colores = [
-      const Color(0xFF1E3A5F),
-      const Color(0xFFC9A96E),
-      const Color(0xFF3B82F6),
-      const Color(0xFF10B981),
-      const Color(0xFFF59E0B),
-      const Color(0xFF8B5CF6),
-    ];
-
-    final serviciosOrdenados = _serviciosMes.entries.toList()
+  Widget _pieFromCounts(Map<String, int> counts) {
+    final entries = counts.entries.toList()
       ..sort((a, b) => b.value.compareTo(a.value));
-    final top5 = serviciosOrdenados.take(5).toList();
+    final top = entries.take(6).toList();
+    if (top.isEmpty) return _sinDatos();
+    return _pie(top.map((e) => (e.key, e.value.toDouble())).toList());
+  }
 
-    if (top5.isEmpty) {
-      return Container(
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: AppColors.border),
-        ),
-        child: const Center(
-          child: Text('Sin datos de servicios'),
-        ),
-      );
-    }
+  Widget _pieMasVendidos(List<Map<String, dynamic>> items) {
+    if (items.isEmpty) return _sinDatos();
+    return _pie(items
+        .take(6)
+        .map((e) => (e['nombre'] as String, (e['unidades'] as int).toDouble()))
+        .toList());
+  }
 
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Servicios del Mes',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              fontFamily: GoogleFonts.dmSans().fontFamily,
-            ),
-          ),
-          const SizedBox(height: 16),
-          SizedBox(
-            height: 180,
-            child: PieChart(
-              PieChartData(
-                sectionsSpace: 2,
-                centerSpaceRadius: 40,
-                sections: top5.asMap().entries.map((entry) {
-                  final index = entry.key;
-                  final servicio = entry.value;
-                  return PieChartSectionData(
-                    color: colores[index % colores.length],
-                    value: servicio.value.toDouble(),
-                    title: '${servicio.value}',
+  Widget _pieCitas(Map<String, dynamic> c) {
+    final data = <(String, double)>[
+      ('Completadas', (c['completadas'] ?? 0).toDouble()),
+      ('Confirmadas', (c['confirmadas'] ?? 0).toDouble()),
+      ('Pendientes', (c['pendientes'] ?? 0).toDouble()),
+      ('Canceladas', (c['canceladas'] ?? 0).toDouble()),
+    ].where((e) => e.$2 > 0).toList();
+    if (data.isEmpty) return _sinDatos();
+    return _pie(data);
+  }
+
+  Widget _pie(List<(String, double)> data) {
+    final total = data.fold<double>(0, (s, e) => s + e.$2);
+    return Column(
+      children: [
+        SizedBox(
+          height: 170,
+          child: PieChart(
+            PieChartData(
+              sectionsSpace: 2,
+              centerSpaceRadius: 40,
+              sections: [
+                for (int i = 0; i < data.length; i++)
+                  PieChartSectionData(
+                    color: _paleta[i % _paleta.length],
+                    value: data[i].$2,
+                    title: total > 0
+                        ? '${(data[i].$2 / total * 100).toStringAsFixed(0)}%'
+                        : '',
                     titleStyle: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white),
                     radius: 50,
-                  );
-                }).toList(),
-              ),
+                  ),
+              ],
             ),
           ),
-          const SizedBox(height: 16),
-          ...top5.asMap().entries.map((entry) {
-            final index = entry.key;
-            final servicio = entry.value;
-            return Padding(
-              padding: const EdgeInsets.symmetric(vertical: 4),
-              child: Row(
-                children: [
-                  Container(
-                    width: 12,
-                    height: 12,
-                    decoration: BoxDecoration(
-                      color: colores[index % colores.length],
-                      borderRadius: BorderRadius.circular(3),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      servicio.key,
+        ),
+        const SizedBox(height: 12),
+        ...List.generate(data.length, (i) {
+          return Padding(
+            padding: const EdgeInsets.symmetric(vertical: 3),
+            child: Row(
+              children: [
+                Container(
+                  width: 12,
+                  height: 12,
+                  decoration: BoxDecoration(
+                      color: _paleta[i % _paleta.length],
+                      borderRadius: BorderRadius.circular(3)),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(data[i].$1,
                       style: const TextStyle(fontSize: 12),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                  Text(
-                    '${servicio.value}',
+                      overflow: TextOverflow.ellipsis),
+                ),
+                Text('${data[i].$2.toInt()}',
                     style: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ],
-              ),
-            );
-          }),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildBottomRow() {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Expanded(
-          flex: 2,
-          child: _buildMetodosPagoChart(),
-        ),
-        const SizedBox(width: 16),
-        Expanded(
-          flex: 3,
-          child: _buildUltimasTransacciones(),
-        ),
+                        fontSize: 12, fontWeight: FontWeight.bold)),
+              ],
+            ),
+          );
+        }),
       ],
     );
   }
 
-  Widget _buildMetodosPagoChart() {
-    final total = _metodosPago.values.fold<double>(0, (sum, v) => sum + v);
-    if (total == 0) {
-      return Container(
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: AppColors.border),
+  Widget _stockCriticoList(List<Map<String, dynamic>> items) {
+    if (items.isEmpty) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 20),
+        child: Center(
+          child: Text('Sin medicamentos en estado crítico',
+              style: TextStyle(color: AppColors.textSecondary)),
         ),
-        child: const Center(child: Text('Sin ventas este mes')),
       );
     }
-
-    final metodos = [
-      ('Efectivo', _metodosPago['efectivo'] ?? 0, const Color(0xFF10B981), Icons.money),
-      ('Tarjeta', _metodosPago['tarjeta'] ?? 0, const Color(0xFF3B82F6), Icons.credit_card),
-      ('Visa Cuotas', _metodosPago['visa_cuotas'] ?? 0, const Color(0xFFF59E0B), Icons.calendar_month),
-    ];
-
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Métodos de Pago',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              fontFamily: GoogleFonts.dmSans().fontFamily,
-            ),
+    return Column(
+      children: items.take(8).map((m) {
+        return Padding(
+          padding: const EdgeInsets.symmetric(vertical: 6),
+          child: Row(
+            children: [
+              const Icon(Icons.warning_amber,
+                  size: 16, color: AppColors.danger),
+              const SizedBox(width: 8),
+              Expanded(child: Text(m['nombre'] ?? '')),
+              Text('${m['cantidad']}/${m['minimo']}',
+                  style: const TextStyle(
+                      fontWeight: FontWeight.bold, color: AppColors.danger)),
+            ],
           ),
-          const SizedBox(height: 20),
-          ...metodos.map((metodo) {
-            final porcentaje = total > 0 ? (metodo.$2 / total * 100) : 0;
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Icon(metodo.$4, size: 18, color: metodo.$3),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          metodo.$1,
-                          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
-                        ),
-                      ),
-                      Text(
-                        'Q ${NumberFormat('#,##0').format(metodo.$2)}',
-                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 6),
-                  Stack(
-                    children: [
-                      Container(
-                        height: 8,
-                        decoration: BoxDecoration(
-                          color: metodo.$3.withValues(alpha: 0.2),
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                      ),
-                      FractionallySizedBox(
-                        widthFactor: porcentaje / 100,
-                        child: Container(
-                          height: 8,
-                          decoration: BoxDecoration(
-                            color: metodo.$3,
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    '${porcentaje.toStringAsFixed(1)}%',
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
-                ],
-              ),
-            );
-          }),
-        ],
-      ),
+        );
+      }).toList(),
     );
   }
 
-  Widget _buildUltimasTransacciones() {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  'Últimas Transacciones',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    fontFamily: GoogleFonts.dmSans().fontFamily,
-                  ),
-                ),
-                TextButton(
-                  onPressed: () {},
-                  child: const Text('Ver todas'),
-                ),
-              ],
-            ),
-          ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-            color: AppColors.bgGeneral,
-            child: const Row(
-              children: [
-                Expanded(flex: 2, child: Text('Paciente', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600))),
-                Expanded(flex: 2, child: Text('Servicio', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600))),
-                Expanded(child: Text('Monto', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600))),
-                Expanded(child: Text('Método', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600))),
-                Expanded(child: Text('Estado', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600))),
-              ],
-            ),
-          ),
-          if (_ultimasVentas.isEmpty)
-            const Padding(
-              padding: EdgeInsets.all(20),
-              child: Center(child: Text('Sin transacciones recientes')),
-            )
-          else
-            ..._ultimasVentas.asMap().entries.map((entry) {
-              final index = entry.key;
-              final venta = entry.value;
-              final isEven = index % 2 == 0;
-
-              return Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                color: isEven ? Colors.white : const Color(0xFFFAFBFC),
-                child: Row(
-                  children: [
-                    Expanded(
-                      flex: 2,
-                      child: Text(
-                        venta.nombrePaciente,
-                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    Expanded(
-                      flex: 2,
-                      child: Text(
-                        venta.serviciosResumen,
-                        style: const TextStyle(fontSize: 12),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    Expanded(
-                      child: Text(
-                        'Q${venta.monto.toStringAsFixed(0)}',
-                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
-                      ),
-                    ),
-                    Expanded(
-                      child: _buildMetodoBadge(venta.metodoPago),
-                    ),
-                    Expanded(
-                      child: _buildEstadoBadge(venta.estado),
-                    ),
-                  ],
-                ),
-              );
-            }),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildMetodoBadge(String metodo) {
-    Color color;
-    String label;
-    IconData icon;
-
-    switch (metodo) {
-      case 'efectivo':
-        color = const Color(0xFF10B981);
-        label = 'Efectivo';
-        icon = Icons.money;
-        break;
-      case 'tarjeta':
-        color = const Color(0xFF3B82F6);
-        label = 'Tarjeta';
-        icon = Icons.credit_card;
-        break;
-      case 'visa_cuotas':
-        color = const Color(0xFFF59E0B);
-        label = 'Cuotas';
-        icon = Icons.calendar_month;
-        break;
-      default:
-        color = AppColors.textSecondary;
-        label = metodo;
-        icon = Icons.payment;
-    }
-
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(icon, size: 14, color: color),
-        const SizedBox(width: 4),
-        Text(label, style: TextStyle(fontSize: 11, color: color)),
-      ],
-    );
-  }
-
-  Widget _buildEstadoBadge(String estado) {
-    Color bgColor;
-    Color textColor;
-    String label;
-
-    switch (estado) {
-      case 'pagado':
-        bgColor = const Color(0xFF10B981).withValues(alpha: 0.1);
-        textColor = const Color(0xFF10B981);
-        label = 'Pagado';
-        break;
-      case 'anulado':
-        bgColor = const Color(0xFFEF4444).withValues(alpha: 0.1);
-        textColor = const Color(0xFFEF4444);
-        label = 'Anulado';
-        break;
-      default:
-        bgColor = AppColors.border;
-        textColor = AppColors.textSecondary;
-        label = estado;
-    }
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: bgColor,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Text(
-        label,
-        style: TextStyle(fontSize: 10, color: textColor, fontWeight: FontWeight.w600),
-      ),
-    );
-  }
-}
-
-class _KPICard extends StatelessWidget {
-  final String titulo;
-  final String valor;
-  final IconData icono;
-  final Color color;
-  final String subtitulo;
-
-  const _KPICard({
-    required this.titulo,
-    required this.valor,
-    required this.icono,
-    required this.color,
-    required this.subtitulo,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.border),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.03),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 48,
-            height: 48,
-            decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(icono, color: color, size: 24),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  titulo,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: AppColors.textSecondary,
-                    fontFamily: GoogleFonts.dmSans().fontFamily,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  valor,
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.textPrimary,
-                    fontFamily: GoogleFonts.dmSans().fontFamily,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  subtitulo,
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: color,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+  Widget _sinDatos() => const Padding(
+        padding: EdgeInsets.symmetric(vertical: 30),
+        child: Center(
+            child: Text('Sin datos',
+                style: TextStyle(color: AppColors.textSecondary))),
+      );
 }

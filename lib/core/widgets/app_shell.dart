@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../features/auth/providers/auth_provider.dart';
+import '../utils/app_exit.dart';
 import '../../data/mock/providers.dart';
 import '../theme/app_theme.dart';
 import 'sidebar_item.dart';
@@ -28,7 +29,15 @@ class AppShell extends ConsumerWidget {
     final usuarioActivo = ref.watch(usuarioActivoProvider);
     final rol = usuarioActivo?.rol;
 
-    return Scaffold(
+    return PopScope(
+      // Bloquear la salida de la app con el botón Atrás / gesto: solo se sale
+      // confirmando en el diálogo (la sesión se mantiene activa).
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        _mostrarDialogoSalir(context);
+      },
+      child: Scaffold(
       floatingActionButton: floatingActionButton,
       body: Row(
         children: [
@@ -184,8 +193,55 @@ class AppShell extends ConsumerWidget {
           ),
         ],
       ),
+      ),
     );
   }
+
+  // Diálogo de salida (mantiene la sesión activa).
+  Future<void> _mostrarDialogoSalir(BuildContext context) async {
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16)),
+        title: const Row(
+          children: [
+            Icon(Icons.exit_to_app, color: AppColors.primary),
+            SizedBox(width: 8),
+            Expanded(child: Text('¿Salir de la aplicación?')),
+          ],
+        ),
+        content: const Text(
+          'Tu sesión quedará activa.\n'
+          'La próxima vez que abras la app entrarás directamente '
+          'sin necesidad de iniciar sesión nuevamente.',
+          style: TextStyle(fontSize: 14),
+        ),
+        actions: [
+          OutlinedButton.icon(
+            onPressed: () => Navigator.of(ctx).pop(),
+            icon: const Icon(Icons.arrow_back, size: 16, color: AppColors.primary),
+            label: const Text('Cancelar',
+                style: TextStyle(color: AppColors.primary)),
+          ),
+          ElevatedButton.icon(
+            onPressed: () {
+              Navigator.of(ctx).pop();
+              _salirDeApp();
+            },
+            icon: const Icon(Icons.exit_to_app, size: 16, color: Colors.white),
+            label: const Text('Salir', style: TextStyle(color: Colors.white)),
+            style:
+                ElevatedButton.styleFrom(backgroundColor: AppColors.primaryDark),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Cierra la app sin cerrar sesión (la sesión de Firebase queda activa).
+  void _salirDeApp() => salirDeApp();
 
   List<Widget> _buildSidebarItems(
       BuildContext context, WidgetRef ref, RolUsuario? rol, Function(int) onNavigate, int selectedIndex) {
@@ -453,6 +509,16 @@ class AppShell extends ConsumerWidget {
         onTap: () async {
           await ref.read(logoutProvider)();
         },
+      ),
+    );
+
+    // Salir de la app (mantiene la sesión activa)
+    items.add(
+      SidebarItem(
+        icon: '↪️',
+        label: 'Salir',
+        isActive: false,
+        onTap: () => _mostrarDialogoSalir(context),
       ),
     );
 

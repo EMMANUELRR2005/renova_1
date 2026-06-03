@@ -8,7 +8,9 @@ import 'package:intl/date_symbol_data_local.dart';
 
 import 'core/router/app_router.dart';
 import 'core/theme/app_theme.dart';
+import 'data/services/auth_service.dart';
 import 'data/services/seed_service.dart';
+import 'features/auth/providers/auth_provider.dart';
 import 'firebase_options.dart';
 
 void main() async {
@@ -56,7 +58,21 @@ void main() async {
     } catch (_) {}
   }
 
-  runApp(const ProviderScope(child: MainApp()));
+  // Restaurar sesión activa: si el usuario solo "salió" de la app (sin cerrar
+  // sesión), FirebaseAuth conserva su sesión y entramos directo al sistema.
+  final usuarioInicial = await AuthService()
+      .getUsuarioActual()
+      .timeout(const Duration(seconds: 5))
+      .then((u) => (u != null && u.activo) ? u : null)
+      .catchError((_) => null);
+
+  runApp(ProviderScope(
+    overrides: [
+      if (usuarioInicial != null)
+        usuarioActivoProvider.overrideWith((ref) => usuarioInicial),
+    ],
+    child: const MainApp(),
+  ));
 }
 
 
