@@ -7,6 +7,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import '../../core/auth/permisos.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/app_shell.dart';
+import '../../core/widgets/widgets_comunes.dart';
 import '../../data/mock/mock_data.dart';
 import '../../data/mock/providers.dart';
 import '../../data/services/catalogo_service.dart';
@@ -134,8 +135,8 @@ class DetallePacienteScreen extends ConsumerWidget {
                       child: Text(
                         paciente.nombreCompleto,
                         style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.w600,
+                          fontSize: 24,
+                          fontWeight: FontWeight.bold,
                           color: AppColors.textPrimary,
                           fontFamily: GoogleFonts.dmSans().fontFamily,
                         ),
@@ -319,7 +320,8 @@ class DetallePacienteScreen extends ConsumerWidget {
                         decoration: BoxDecoration(
                           color: AppColors.card,
                           border: Border.all(color: AppColors.border),
-                          borderRadius: BorderRadius.circular(10),
+                          borderRadius: BorderRadius.circular(16),
+                          boxShadow: kSombraSuave,
                         ),
                         child: Center(
                           child: Text(
@@ -364,7 +366,8 @@ class _InfoCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.card,
         border: Border.all(color: AppColors.border),
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: kSombraSuave,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -467,11 +470,12 @@ class _HistorialCardState extends State<_HistorialCard> {
         : '—';
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 8),
+      margin: const EdgeInsets.only(bottom: 10),
       decoration: BoxDecoration(
         color: AppColors.card,
         border: Border.all(color: AppColors.border),
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(14),
+        boxShadow: kSombraSuave,
       ),
       child: Column(
         children: [

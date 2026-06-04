@@ -101,4 +101,23 @@ class Permisos {
   static bool puedeVenderMedicamentos(RolUsuario? rol) =>
       rol == RolUsuario.secretaria_recepcion ||
       rol == RolUsuario.administradora;
+
+  // ── Boutique ────────────────────────────────────────────────────────────────
+
+  // Ver inventario de boutique: administradora y boutique
+  static bool puedeVerBoutique(RolUsuario? rol) =>
+      rol == RolUsuario.administradora || rol == RolUsuario.boutique;
+
+  // Crear/editar productos de boutique: administradora y boutique
+  static bool puedeGestionarBoutique(RolUsuario? rol) =>
+      rol == RolUsuario.administradora || rol == RolUsuario.boutique;
+
+  // Eliminar productos de boutique: SOLO administradora
+  static bool puedeEliminarBoutique(RolUsuario? rol) =>
+      rol == RolUsuario.administradora;
+
+  // Vender productos de boutique en caja: secretaria y administradora
+  static bool puedeVenderBoutique(RolUsuario? rol) =>
+      rol == RolUsuario.secretaria_recepcion ||
+      rol == RolUsuario.administradora;
 }

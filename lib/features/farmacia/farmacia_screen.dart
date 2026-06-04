@@ -12,6 +12,7 @@ import 'package:image_picker/image_picker.dart';
 import '../../core/auth/permisos.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/app_shell.dart';
+import '../../core/widgets/widgets_comunes.dart';
 import '../../data/mock/mock_data.dart' hide Medicamento;
 import '../../data/mock/providers.dart';
 import '../../data/services/farmacia_service.dart';
@@ -87,8 +88,8 @@ class _FarmaciaScreenState extends ConsumerState<FarmaciaScreen> {
                 Text(
                   'Inventario Farmacia',
                   style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w600,
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
                     color: AppColors.textPrimary,
                     fontFamily: GoogleFonts.dmSans().fontFamily,
                   ),
@@ -186,7 +187,8 @@ class _FarmaciaScreenState extends ConsumerState<FarmaciaScreen> {
         decoration: BoxDecoration(
           color: AppColors.card,
           border: Border.all(color: AppColors.border),
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: kSombraSuave,
         ),
         child: Center(
           child: Text(msg,
@@ -307,12 +309,13 @@ class _MedicamentoCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 10),
+      margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: AppColors.card,
         border: Border.all(color: AppColors.border),
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: kSombraSuave,
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,

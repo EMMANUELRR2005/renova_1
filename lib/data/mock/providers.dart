@@ -13,6 +13,7 @@ import '../services/venta_service.dart';
 import '../services/expediente_service.dart';
 import '../services/reporte_service.dart';
 import '../services/farmacia_service.dart';
+import '../services/boutique_service.dart';
 import '../../features/auth/providers/auth_provider.dart';
 
 // ============================================================================
@@ -399,6 +400,26 @@ int? diasParaVencer(Medicamento m) {
       .difference(DateTime(hoy.year, hoy.month, hoy.day))
       .inDays;
 }
+
+// ============================================================================
+// BOUTIQUE (BOUTIQUE / ADMINISTRADORA)
+// ============================================================================
+
+final boutiqueServiceProvider = Provider((ref) => BoutiqueService());
+
+final productosBoutiqueStreamProvider =
+    StreamProvider<List<ProductoBoutique>>((ref) {
+  final usuario = ref.watch(usuarioActivoProvider);
+  if (usuario == null) return const Stream.empty();
+  return ref.watch(boutiqueServiceProvider).streamProductos();
+});
+
+final movimientosBoutiqueStreamProvider =
+    StreamProvider<List<MovimientoBoutique>>((ref) {
+  final usuario = ref.watch(usuarioActivoProvider);
+  if (usuario == null) return const Stream.empty();
+  return ref.watch(boutiqueServiceProvider).streamMovimientos();
+});
 
 /// Provider derivado del inventario en tiempo real que clasifica las alertas.
 /// Realtime: se recalcula automáticamente cuando cambia el stock.

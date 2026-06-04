@@ -3,7 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../theme/app_theme.dart';
 
 class SidebarItem extends StatelessWidget {
-  final String icon;
+  final IconData icon;
   final String label;
   final bool isActive;
   final VoidCallback onTap;
@@ -20,40 +20,39 @@ class SidebarItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+    return Material(
+      color: Colors.transparent,
+      borderRadius: BorderRadius.circular(10),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(10),
+        onTap: onTap,
+        child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 3),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
         decoration: BoxDecoration(
-          color: isActive ? AppColors.primary : Colors.transparent,
-          borderRadius: BorderRadius.circular(8),
+          color: isActive
+              ? Colors.white.withValues(alpha: 0.15)
+              : Colors.transparent,
+          borderRadius: BorderRadius.circular(10),
           border: isActive
-              ? Border(
-                  left: BorderSide(
-                    color: const Color(0xFF64B5F6),
-                    width: 3,
-                  ),
-                )
+              ? Border.all(color: AppColors.accent.withValues(alpha: 0.5))
               : null,
         ),
         child: Row(
           children: [
-            Text(
+            Icon(
               icon,
-              style: TextStyle(
-                fontSize: 20,
-                color: isActive ? Colors.white : AppColors.textTertiary,
-              ),
+              size: 20,
+              color: isActive ? AppColors.accent : Colors.white70,
             ),
             const SizedBox(width: 12),
             Expanded(
               child: Text(
                 label,
                 style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500,
-                  color: isActive ? Colors.white : AppColors.textTertiary,
+                  fontSize: 13,
+                  fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
+                  color: isActive ? Colors.white : Colors.white70,
                   fontFamily: GoogleFonts.dmSans().fontFamily,
                 ),
               ),
@@ -78,6 +77,7 @@ class SidebarItem extends StatelessWidget {
                 ),
               ),
           ],
+        ),
         ),
       ),
     );

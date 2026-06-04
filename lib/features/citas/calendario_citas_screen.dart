@@ -8,6 +8,7 @@ import 'package:table_calendar/table_calendar.dart';
 import '../../core/auth/permisos.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/app_shell.dart';
+import '../../core/widgets/widgets_comunes.dart';
 import '../../data/mock/mock_data.dart';
 import '../../data/mock/providers.dart';
 import '../../features/auth/providers/auth_provider.dart';
@@ -121,8 +122,8 @@ class _CalendarioCitasScreenState extends ConsumerState<CalendarioCitasScreen> {
               ? 'Mi Agenda'
               : 'Agenda de Citas',
           style: TextStyle(
-            fontSize: 20,
-            fontWeight: FontWeight.w600,
+            fontSize: 24,
+            fontWeight: FontWeight.bold,
             color: AppColors.textPrimary,
             fontFamily: GoogleFonts.dmSans().fontFamily,
           ),
@@ -195,7 +196,8 @@ class _CalendarioCitasScreenState extends ConsumerState<CalendarioCitasScreen> {
           decoration: BoxDecoration(
             color: AppColors.card,
             border: Border.all(color: AppColors.border),
-            borderRadius: BorderRadius.circular(10),
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: kSombraSuave,
           ),
           padding: const EdgeInsets.all(8),
           child: TableCalendar<CitaMedica>(
@@ -524,8 +526,10 @@ class _CalendarioCitasScreenState extends ConsumerState<CalendarioCitasScreen> {
           decoration: BoxDecoration(
             color: AppColors.card,
             border: Border.all(color: AppColors.border),
-            borderRadius: BorderRadius.circular(10),
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: kSombraSuave,
           ),
+          clipBehavior: Clip.antiAlias,
           child: Column(
             children: List.generate(13, (i) {
               final hora = 7 + i; // 07:00 .. 19:00

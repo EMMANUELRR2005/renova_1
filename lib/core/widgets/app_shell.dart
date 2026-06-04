@@ -49,32 +49,104 @@ class AppShell extends ConsumerWidget {
               children: [
                 // Logo area
                 Padding(
-                  padding: const EdgeInsets.all(16),
+                  padding: const EdgeInsets.fromLTRB(16, 40, 16, 16),
                   child: Column(
                     children: [
                       ClipRRect(
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: BorderRadius.circular(12),
                         child: Image.asset(
                           'assets/images/logo_renova.png',
-                          height: 60,
+                          height: 56,
                           fit: BoxFit.contain,
                         ),
                       ),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 10),
                       Text(
                         'Clínica Renova',
                         textAlign: TextAlign.center,
                         style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
                           color: Colors.white,
                           fontFamily: GoogleFonts.dmSans().fontFamily,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      // Chip de rol (acento dorado)
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: AppColors.accent.withValues(alpha: 0.2),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                              color: AppColors.accent.withValues(alpha: 0.5)),
+                        ),
+                        child: Text(
+                          _getRolLabel(rol),
+                          style: const TextStyle(
+                            color: AppColors.accent,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                       ),
                     ],
                   ),
                 ),
-                const Divider(color: Color(0xFF1A3F5C)),
+                // Tarjeta de usuario
+                Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 12),
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    children: [
+                      CircleAvatar(
+                        radius: 18,
+                        backgroundColor: AppColors.accent,
+                        child: Text(
+                          (usuarioActivo?.avatarIniciales.isNotEmpty ?? false)
+                              ? usuarioActivo!.avatarIniciales
+                              : (usuarioActivo?.nombre.isNotEmpty ?? false)
+                                  ? usuarioActivo!.nombre[0].toUpperCase()
+                                  : 'U',
+                          style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 13),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              usuarioActivo?.nombre ?? 'Usuario',
+                              style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            Text(
+                              usuarioActivo?.email ?? '',
+                              style: TextStyle(
+                                  color: Colors.white.withValues(alpha: 0.6),
+                                  fontSize: 10),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Divider(color: Colors.white.withValues(alpha: 0.1)),
                 Expanded(
                   child: ListView(
                     padding: EdgeInsets.zero,
@@ -84,111 +156,12 @@ class AppShell extends ConsumerWidget {
               ],
             ),
           ),
-          // MAIN CONTENT
+          // MAIN CONTENT (sin barra superior duplicada: solo el contenido,
+          // cuyo header lo aporta cada pantalla)
           Expanded(
-            child: Column(
-              children: [
-                // TOPBAR
-                Container(
-                  height: 56,
-                  decoration: BoxDecoration(
-                    color: AppColors.topbar,
-                    border: Border(bottom: BorderSide(color: AppColors.border)),
-                  ),
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      // Left
-                      Row(
-                        children: [
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(8),
-                            child: Image.asset(
-                              'assets/images/logo_renova.png',
-                              height: 36,
-                              fit: BoxFit.contain,
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Text(
-                            'Clínica Renova',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                              color: AppColors.textPrimary,
-                              fontFamily: GoogleFonts.dmSans().fontFamily,
-                            ),
-                          ),
-                        ],
-                      ),
-                      // Center - Rol actual
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 12, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: AppColors.primaryLight,
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Text(
-                          _getRolLabel(rol),
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w500,
-                            color: AppColors.primary,
-                            fontFamily: GoogleFonts.dmSans().fontFamily,
-                          ),
-                        ),
-                      ),
-                      // Right
-                      Row(
-                        children: [
-                          const Text(
-                            '🔔',
-                            style: TextStyle(fontSize: 20),
-                          ),
-                          const SizedBox(width: 16),
-                          Container(
-                            width: 36,
-                            height: 36,
-                            decoration: BoxDecoration(
-                              color: AppColors.primaryLight,
-                              borderRadius: BorderRadius.circular(18),
-                            ),
-                            child: Center(
-                              child: Text(
-                                usuarioActivo?.avatarIniciales ?? 'RN',
-                                style: const TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w600,
-                                  color: AppColors.primary,
-                                ),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Text(
-                            usuarioActivo?.nombre ?? 'Usuario',
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w500,
-                              color: AppColors.textPrimary,
-                              fontFamily: GoogleFonts.dmSans().fontFamily,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-                // CONTENT AREA
-                Expanded(
-                  child: Container(
-                    color: AppColors.bgGeneral,
-                    child: child,
-                  ),
-                ),
-              ],
+            child: Container(
+              color: AppColors.bgGeneral,
+              child: child,
             ),
           ),
         ],
@@ -257,7 +230,7 @@ class AppShell extends ConsumerWidget {
     if (rol == RolUsuario.administradora) {
       items.addAll([
         SidebarItem(
-          icon: '📊',
+          icon: Icons.dashboard_rounded,
           label: 'Dashboard',
           isActive: selectedIndex == 0,
           onTap: () {
@@ -266,7 +239,7 @@ class AppShell extends ConsumerWidget {
           },
         ),
         SidebarItem(
-          icon: '👨‍💼',
+          icon: Icons.manage_accounts_rounded,
           label: 'Usuarios',
           isActive: selectedIndex == 1,
           onTap: () {
@@ -275,7 +248,7 @@ class AppShell extends ConsumerWidget {
           },
         ),
         SidebarItem(
-          icon: '📈',
+          icon: Icons.bar_chart_rounded,
           label: 'Reportes',
           isActive: selectedIndex == 2,
           onTap: () {
@@ -284,7 +257,7 @@ class AppShell extends ConsumerWidget {
           },
         ),
         SidebarItem(
-          icon: '💊',
+          icon: Icons.local_pharmacy_rounded,
           label: 'Farmacia',
           isActive: selectedIndex == 3,
           badgeCount: alertasFarmacia,
@@ -294,7 +267,7 @@ class AppShell extends ConsumerWidget {
           },
         ),
         SidebarItem(
-          icon: '📆',
+          icon: Icons.event_note_rounded,
           label: 'Agenda',
           isActive: selectedIndex == 4,
           onTap: () {
@@ -303,12 +276,48 @@ class AppShell extends ConsumerWidget {
           },
         ),
         SidebarItem(
-          icon: '🧾',
+          icon: Icons.receipt_long_rounded,
           label: 'Cierres Caja',
           isActive: selectedIndex == 5,
           onTap: () {
             onNavigate(5);
             context.go('/caja/cierres');
+          },
+        ),
+        SidebarItem(
+          icon: Icons.checkroom_rounded,
+          label: 'Boutique',
+          isActive: selectedIndex == 6,
+          onTap: () {
+            onNavigate(6);
+            context.go('/boutique');
+          },
+        ),
+        const Padding(
+          padding: EdgeInsets.symmetric(vertical: 8),
+          child: Divider(color: Color(0xFF1A3F5C)),
+        ),
+      ]);
+    }
+    // BOUTIQUE: Inventario, Movimientos
+    else if (rol == RolUsuario.boutique) {
+      items.addAll([
+        SidebarItem(
+          icon: Icons.checkroom_rounded,
+          label: 'Inventario',
+          isActive: selectedIndex == 0,
+          onTap: () {
+            onNavigate(0);
+            context.go('/boutique');
+          },
+        ),
+        SidebarItem(
+          icon: Icons.swap_horiz_rounded,
+          label: 'Movimientos',
+          isActive: selectedIndex == 1,
+          onTap: () {
+            onNavigate(1);
+            context.go('/boutique/movimientos');
           },
         ),
         const Padding(
@@ -321,7 +330,7 @@ class AppShell extends ConsumerWidget {
     else if (rol == RolUsuario.farmaceutica) {
       items.addAll([
         SidebarItem(
-          icon: '💊',
+          icon: Icons.inventory_2_rounded,
           label: 'Inventario',
           isActive: selectedIndex == 0,
           badgeCount: alertasFarmacia,
@@ -331,7 +340,7 @@ class AppShell extends ConsumerWidget {
           },
         ),
         SidebarItem(
-          icon: '📦',
+          icon: Icons.swap_horiz_rounded,
           label: 'Movimientos',
           isActive: selectedIndex == 1,
           onTap: () {
@@ -340,7 +349,7 @@ class AppShell extends ConsumerWidget {
           },
         ),
         SidebarItem(
-          icon: '⚠️',
+          icon: Icons.warning_amber_rounded,
           label: 'Alertas',
           isActive: selectedIndex == 2,
           badgeCount: alertasFarmacia,
@@ -359,7 +368,7 @@ class AppShell extends ConsumerWidget {
     else if (rol == RolUsuario.secretaria_recepcion) {
       items.addAll([
         SidebarItem(
-          icon: '👥',
+          icon: Icons.people_alt_rounded,
           label: 'Pacientes',
           isActive: selectedIndex == 0,
           onTap: () {
@@ -368,7 +377,7 @@ class AppShell extends ConsumerWidget {
           },
         ),
         SidebarItem(
-          icon: '📅',
+          icon: Icons.calendar_month_rounded,
           label: 'Citas',
           isActive: selectedIndex == 1,
           onTap: () {
@@ -377,7 +386,7 @@ class AppShell extends ConsumerWidget {
           },
         ),
         SidebarItem(
-          icon: '💰',
+          icon: Icons.point_of_sale_rounded,
           label: 'Caja',
           isActive: selectedIndex == 2,
           onTap: () {
@@ -386,7 +395,7 @@ class AppShell extends ConsumerWidget {
           },
         ),
         SidebarItem(
-          icon: '📆',
+          icon: Icons.event_note_rounded,
           label: 'Agenda',
           isActive: selectedIndex == 3,
           onTap: () {
@@ -404,7 +413,7 @@ class AppShell extends ConsumerWidget {
     else if (rol == RolUsuario.enfermera) {
       items.addAll([
         SidebarItem(
-          icon: '👥',
+          icon: Icons.people_alt_rounded,
           label: 'Pacientes',
           isActive: selectedIndex == 0,
           onTap: () {
@@ -413,7 +422,7 @@ class AppShell extends ConsumerWidget {
           },
         ),
         SidebarItem(
-          icon: '📋',
+          icon: Icons.folder_open_rounded,
           label: 'Expedientes',
           isActive: selectedIndex == 1,
           onTap: () {
@@ -422,7 +431,7 @@ class AppShell extends ConsumerWidget {
           },
         ),
         SidebarItem(
-          icon: '📆',
+          icon: Icons.event_note_rounded,
           label: 'Agenda',
           isActive: selectedIndex == 2,
           onTap: () {
@@ -440,7 +449,7 @@ class AppShell extends ConsumerWidget {
     else if (rol == RolUsuario.doctora) {
       items.addAll([
         SidebarItem(
-          icon: '👥',
+          icon: Icons.people_alt_rounded,
           label: 'Pacientes',
           isActive: selectedIndex == 0,
           onTap: () {
@@ -449,7 +458,7 @@ class AppShell extends ConsumerWidget {
           },
         ),
         SidebarItem(
-          icon: '📅',
+          icon: Icons.calendar_month_rounded,
           label: 'Mis Citas',
           isActive: selectedIndex == 1,
           onTap: () {
@@ -458,7 +467,7 @@ class AppShell extends ConsumerWidget {
           },
         ),
         SidebarItem(
-          icon: '📋',
+          icon: Icons.folder_open_rounded,
           label: 'Expedientes',
           isActive: selectedIndex == 2,
           onTap: () {
@@ -467,7 +476,7 @@ class AppShell extends ConsumerWidget {
           },
         ),
         SidebarItem(
-          icon: '📆',
+          icon: Icons.event_note_rounded,
           label: 'Agenda',
           isActive: selectedIndex == 3,
           onTap: () {
@@ -485,7 +494,7 @@ class AppShell extends ConsumerWidget {
     else if (rol == RolUsuario.terapeuta) {
       items.addAll([
         SidebarItem(
-          icon: '📅',
+          icon: Icons.calendar_month_rounded,
           label: 'Mi Agenda',
           isActive: selectedIndex == 0,
           onTap: () {
@@ -503,7 +512,7 @@ class AppShell extends ConsumerWidget {
     // Cerrar sesión (todos los roles)
     items.add(
       SidebarItem(
-        icon: '🚪',
+        icon: Icons.logout_rounded,
         label: 'Cerrar sesión',
         isActive: false,
         onTap: () async {
@@ -515,7 +524,7 @@ class AppShell extends ConsumerWidget {
     // Salir de la app (mantiene la sesión activa)
     items.add(
       SidebarItem(
-        icon: '↪️',
+        icon: Icons.exit_to_app_rounded,
         label: 'Salir',
         isActive: false,
         onTap: () => _mostrarDialogoSalir(context),
@@ -539,6 +548,8 @@ class AppShell extends ConsumerWidget {
         return 'Doctora';
       case RolUsuario.farmaceutica:
         return 'Farmacéutica';
+      case RolUsuario.boutique:
+        return 'Boutique';
       case null:
         return 'Sin rol';
     }

@@ -27,9 +27,12 @@ class AuthService {
     try {
       return await op();
     } on FirebaseException catch (e) {
-      if (e.code != 'unavailable') rethrow;
-      print('⚠️ [Auth] Firestore no disponible — reintentando en 2s...');
-      await Future.delayed(const Duration(seconds: 2));
+      // `unavailable`: cold-start de Firestore.
+      // `permission-denied`: carrera de arranque en la que el token de auth aún
+      //   no llegó a Firestore. En ambos casos un reintento corto lo resuelve.
+      if (e.code != 'unavailable' && e.code != 'permission-denied') rethrow;
+      print('⚠️ [Auth] Firestore ${e.code} — reintentando en 1.5s...');
+      await Future.delayed(const Duration(milliseconds: 1500));
       return await op(); // segundo intento, sin más
     }
   }
@@ -123,11 +126,34 @@ class AuthService {
   }
 
   Future<Usuario?> getUsuarioActual() async {
-    final user = _auth.currentUser;
-    if (user == null) return null;
-    final doc = await _db.collection('usuarios').doc(user.uid).get();
-    if (!doc.exists) return null;
-    return Usuario.fromMap(doc.data()!, user.uid);
+    // En el arranque en frío `currentUser` puede ser null momentáneamente
+    // mientras Firebase Auth restaura la sesión persistida. Esperamos al primer
+    // evento de authStateChanges para conocer el estado real.
+    User? user = _auth.currentUser ?? await _auth.authStateChanges().first;
+    if (user == null) {
+      print('🔵 [Auth] Sin sesión persistida al arrancar');
+      return null;
+    }
+
+    // CLAVE: forzar que el ID token esté disponible y propagado ANTES de leer
+    // Firestore. Sin esto, una lectura inmediata en el arranque puede fallar con
+    // permission-denied porque Firestore aún no recibió el token de auth.
+    try {
+      await user.getIdToken();
+    } catch (e) {
+      print('⚠️ [Auth] No se pudo obtener idToken: $e');
+    }
+
+    final uid = user.uid;
+    print('🔵 [Auth] Sesión restaurada: $uid (${user.email})');
+
+    final doc = await _withRetry(
+        () => _db.collection('usuarios').doc(uid).get());
+    if (!doc.exists) {
+      print('❌ [Auth] El documento usuarios/$uid no existe');
+      return null;
+    }
+    return Usuario.fromMap(doc.data()!, uid);
   }
 
   Stream<User?> get authStateChanges => _auth.authStateChanges();

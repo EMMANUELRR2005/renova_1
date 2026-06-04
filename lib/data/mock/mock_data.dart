@@ -11,6 +11,7 @@ enum RolUsuario {
   secretaria_recepcion,
   doctora,
   farmaceutica,
+  boutique,
 }
 
 enum EspecialidadTerapeuta {

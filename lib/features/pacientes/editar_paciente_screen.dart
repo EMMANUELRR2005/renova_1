@@ -11,6 +11,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/app_shell.dart';
+import '../../core/widgets/widgets_comunes.dart';
 import '../../data/mock/mock_data.dart';
 import '../../data/mock/providers.dart';
 import '../../features/auth/providers/auth_provider.dart';
@@ -443,8 +444,8 @@ class _EditarPacienteScreenState extends ConsumerState<EditarPacienteScreen> {
                       Text(
                         'Editar Paciente',
                         style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.w600,
+                          fontSize: 24,
+                          fontWeight: FontWeight.bold,
                           color: AppColors.textPrimary,
                           fontFamily: GoogleFonts.dmSans().fontFamily,
                         ),
@@ -647,11 +648,12 @@ class _SectionCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         color: AppColors.card,
         border: Border.all(color: AppColors.border),
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: kSombraSuave,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

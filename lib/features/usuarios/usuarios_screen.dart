@@ -8,6 +8,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/app_shell.dart';
+import '../../core/widgets/widgets_comunes.dart';
 import '../../data/mock/mock_data.dart';
 import '../../data/mock/providers.dart' hide authServiceProvider;
 import '../../features/auth/providers/auth_provider.dart';
@@ -33,15 +34,16 @@ class UsuariosScreen extends ConsumerWidget {
                 Text(
                   'Gestión de Usuarios',
                   style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w600,
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
                     color: AppColors.textPrimary,
                     fontFamily: GoogleFonts.dmSans().fontFamily,
                   ),
                 ),
-                ElevatedButton(
+                ElevatedButton.icon(
                   onPressed: () => _showNuevoUsuarioDialog(context, ref),
-                  child: const Text('+ Nuevo Usuario'),
+                  icon: const Icon(Icons.person_add_alt_1, size: 18),
+                  label: const Text('Nuevo Usuario'),
                 ),
               ],
             ),
@@ -51,7 +53,8 @@ class UsuariosScreen extends ConsumerWidget {
                 decoration: BoxDecoration(
                   color: AppColors.card,
                   border: Border.all(color: AppColors.border),
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: kSombraSuave,
                 ),
                 padding: const EdgeInsets.all(16),
                 child: const Center(child: CircularProgressIndicator()),
@@ -60,7 +63,8 @@ class UsuariosScreen extends ConsumerWidget {
                 decoration: BoxDecoration(
                   color: AppColors.card,
                   border: Border.all(color: AppColors.border),
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: kSombraSuave,
                 ),
                 padding: const EdgeInsets.all(16),
                 child: Center(
@@ -74,8 +78,10 @@ class UsuariosScreen extends ConsumerWidget {
                 decoration: BoxDecoration(
                   color: AppColors.card,
                   border: Border.all(color: AppColors.border),
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: kSombraSuave,
                 ),
+                clipBehavior: Clip.antiAlias,
                 child: ListView.builder(
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
@@ -90,79 +96,95 @@ class UsuariosScreen extends ConsumerWidget {
                             : null,
                       ),
                       child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                usuario.nombre,
-                                style: const TextStyle(
-                                    fontSize: 14, fontWeight: FontWeight.w600),
+                          // Avatar con iniciales
+                          CircleAvatar(
+                            radius: 22,
+                            backgroundColor:
+                                _getRolColor(usuario.rol).withValues(alpha: 0.12),
+                            child: Text(
+                              usuario.avatarIniciales.isNotEmpty
+                                  ? usuario.avatarIniciales
+                                  : (usuario.nombre.isNotEmpty
+                                      ? usuario.nombre[0].toUpperCase()
+                                      : 'U'),
+                              style: TextStyle(
+                                color: _getRolColor(usuario.rol),
+                                fontWeight: FontWeight.bold,
+                                fontSize: 15,
                               ),
-                              const SizedBox(height: 4),
-                              Text(
-                                usuario.email,
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: AppColors.textSecondary,
-                                  fontFamily: GoogleFonts.dmSans().fontFamily,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 8, vertical: 2),
-                                decoration: BoxDecoration(
-                                  color: _getRolColor(usuario.rol),
-                                  borderRadius: BorderRadius.circular(4),
-                                ),
-                                child: Text(
-                                  _getRolLabel(usuario.rol),
+                            ),
+                          ),
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  usuario.nombre,
                                   style: const TextStyle(
-                                    fontSize: 10,
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.w600,
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w600),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  usuario.email,
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    color: AppColors.textSecondary,
                                   ),
                                 ),
-                              ),
-                            ],
+                                const SizedBox(height: 6),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 10, vertical: 3),
+                                  decoration: BoxDecoration(
+                                    color: _getRolColor(usuario.rol)
+                                        .withValues(alpha: 0.1),
+                                    borderRadius: BorderRadius.circular(20),
+                                  ),
+                                  child: Text(
+                                    _getRolLabel(usuario.rol),
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      color: _getRolColor(usuario.rol),
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
+                          const SizedBox(width: 12),
                           Column(
                             crossAxisAlignment: CrossAxisAlignment.end,
                             children: [
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 8, vertical: 4),
-                                decoration: BoxDecoration(
-                                  color: usuario.activo
-                                      ? AppColors.successBg
-                                      : AppColors.dangerBg,
-                                  borderRadius: BorderRadius.circular(4),
-                                ),
-                                child: Text(
-                                  usuario.activo ? 'Activo' : 'Inactivo',
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    color: usuario.activo
-                                        ? AppColors.success
-                                        : AppColors.danger,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ),
+                              buildBadgeEstado(
+                                  usuario.activo ? 'activo' : 'inactivo'),
                               const SizedBox(height: 8),
-                              ElevatedButton(
+                              OutlinedButton.icon(
                                 onPressed: () => _toggleUsuario(
                                     context, ref, usuario.id, !usuario.activo),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: usuario.activo
+                                icon: Icon(
+                                  usuario.activo
+                                      ? Icons.block
+                                      : Icons.check_circle_outline,
+                                  size: 16,
+                                ),
+                                label: Text(
+                                  usuario.activo ? 'Desactivar' : 'Activar',
+                                  style: const TextStyle(fontSize: 12),
+                                ),
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: usuario.activo
                                       ? AppColors.warning
                                       : AppColors.success,
-                                ),
-                                child: Text(
-                                  usuario.activo ? 'Desactivar' : 'Activar',
-                                  style: const TextStyle(fontSize: 11),
+                                  side: BorderSide(
+                                      color: usuario.activo
+                                          ? AppColors.warning
+                                          : AppColors.success),
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 12, vertical: 8),
                                 ),
                               ),
                             ],
@@ -231,6 +253,8 @@ class UsuariosScreen extends ConsumerWidget {
         return const Color(0xFF00838F);
       case RolUsuario.farmaceutica:
         return const Color(0xFF00796B);
+      case RolUsuario.boutique:
+        return const Color(0xFFC9A96E);
     }
   }
 
@@ -248,6 +272,8 @@ class UsuariosScreen extends ConsumerWidget {
         return 'Terapeuta';
       case RolUsuario.farmaceutica:
         return 'Farmacéutica';
+      case RolUsuario.boutique:
+        return 'Boutique';
     }
   }
 }
@@ -278,6 +304,7 @@ class _NuevoUsuarioDialogState extends State<_NuevoUsuarioDialog> {
     (RolUsuario.enfermera, 'Enfermera'),
     (RolUsuario.secretaria_recepcion, 'Secretaria de Recepción'),
     (RolUsuario.farmaceutica, 'Farmacéutica'),
+    (RolUsuario.boutique, 'Boutique'),
   ];
 
   RolUsuario _rolSeleccionado = RolUsuario.enfermera;

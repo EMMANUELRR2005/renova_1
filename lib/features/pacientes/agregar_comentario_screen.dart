@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/app_shell.dart';
+import '../../core/widgets/widgets_comunes.dart';
 import '../../data/mock/mock_data.dart';
 import '../../data/mock/providers.dart';
 import '../../features/auth/providers/auth_provider.dart';
@@ -103,8 +104,8 @@ class _AgregarComentarioScreenState
                     Text(
                       'Agregar Nota / Comentario',
                       style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w600,
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
                         color: AppColors.textPrimary,
                         fontFamily: GoogleFonts.dmSans().fontFamily,
                       ),
@@ -117,7 +118,8 @@ class _AgregarComentarioScreenState
                   decoration: BoxDecoration(
                     color: AppColors.card,
                     border: Border.all(color: AppColors.border),
-                    borderRadius: BorderRadius.circular(10),
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: kSombraSuave,
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,

@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/app_shell.dart';
+import '../../core/widgets/widgets_comunes.dart';
 import '../../data/mock/mock_data.dart';
 import '../../data/services/cierre_service.dart';
 import '../../features/auth/providers/auth_provider.dart';
@@ -57,8 +58,8 @@ class CierresHistoricoScreen extends ConsumerWidget {
                 Text(
                   'Histórico de Cierres de Caja',
                   style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w600,
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
                     color: AppColors.textPrimary,
                     fontFamily: GoogleFonts.dmSans().fontFamily,
                   ),
@@ -89,7 +90,8 @@ class CierresHistoricoScreen extends ConsumerWidget {
         decoration: BoxDecoration(
           color: AppColors.card,
           border: Border.all(color: AppColors.border),
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: kSombraSuave,
         ),
         child: const Center(
           child: Text('Aún no se han realizado cierres de caja',
@@ -99,10 +101,12 @@ class CierresHistoricoScreen extends ConsumerWidget {
 
   Widget _buildTabla(List<CierreCaja> cierres) {
     return Container(
+      clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
         color: AppColors.card,
         border: Border.all(color: AppColors.border),
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: kSombraSuave,
       ),
       child: Column(
         children: [

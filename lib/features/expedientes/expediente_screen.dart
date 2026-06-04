@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../core/auth/permisos.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/app_shell.dart';
+import '../../core/widgets/widgets_comunes.dart';
 import '../../data/mock/providers.dart';
 import '../../data/services/expediente_service.dart';
 import '../../features/auth/providers/auth_provider.dart';
@@ -31,8 +32,8 @@ class ExpedienteScreen extends ConsumerWidget {
                 Text(
                   'Expedientes',
                   style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w600,
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
                     color: AppColors.textPrimary,
                     fontFamily: GoogleFonts.dmSans().fontFamily,
                   ),
@@ -99,8 +100,10 @@ class ExpedienteScreen extends ConsumerWidget {
       decoration: BoxDecoration(
         color: AppColors.card,
         border: Border.all(color: AppColors.border),
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: kSombraSuave,
       ),
+      clipBehavior: Clip.antiAlias,
       child: expedientesAsync.when(
         loading: () => const Center(
           child: Padding(
@@ -164,7 +167,10 @@ class ExpedienteScreen extends ConsumerWidget {
         DataCell(Text(
           '${expediente.fechaApertura.day.toString().padLeft(2, '0')}/${expediente.fechaApertura.month.toString().padLeft(2, '0')}/${expediente.fechaApertura.year}',
         )),
-        DataCell(_buildEstadoBadge(expediente.estado)),
+        DataCell(buildBadgeEstado(
+          expediente.estado == 'abierto' ? 'activo' : 'inactivo',
+          label: expediente.estado == 'abierto' ? 'Abierto' : 'Cerrado',
+        )),
         DataCell(Row(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -181,25 +187,6 @@ class ExpedienteScreen extends ConsumerWidget {
           ],
         )),
       ],
-    );
-  }
-
-  Widget _buildEstadoBadge(String estado) {
-    final abierto = estado == 'abierto';
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: abierto ? AppColors.successBg : AppColors.dangerBg,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Text(
-        abierto ? 'Abierto' : 'Cerrado',
-        style: TextStyle(
-          fontSize: 11,
-          fontWeight: FontWeight.w600,
-          color: abierto ? AppColors.success : AppColors.danger,
-        ),
-      ),
     );
   }
 
@@ -252,7 +239,10 @@ class _DetalleExpedienteDialog extends ConsumerWidget {
                   ),
                 ),
                 const SizedBox(width: 12),
-                _buildEstadoBadge(expediente.estado),
+                buildBadgeEstado(
+                  expediente.estado == 'abierto' ? 'activo' : 'inactivo',
+                  label: expediente.estado == 'abierto' ? 'Abierto' : 'Cerrado',
+                ),
                 const Spacer(),
                 IconButton(
                   icon: const Icon(Icons.close),
@@ -284,32 +274,13 @@ class _DetalleExpedienteDialog extends ConsumerWidget {
     );
   }
 
-  Widget _buildEstadoBadge(String estado) {
-    final abierto = estado == 'abierto';
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: abierto ? AppColors.successBg : AppColors.dangerBg,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Text(
-        abierto ? 'Abierto' : 'Cerrado',
-        style: TextStyle(
-          fontSize: 11,
-          fontWeight: FontWeight.w600,
-          color: abierto ? AppColors.success : AppColors.danger,
-        ),
-      ),
-    );
-  }
-
   Widget _buildInfoExpediente() {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: AppColors.card,
         border: Border.all(color: AppColors.border),
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(14),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -346,7 +317,7 @@ class _DetalleExpedienteDialog extends ConsumerWidget {
       decoration: BoxDecoration(
         color: AppColors.card,
         border: Border.all(color: AppColors.border),
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(14),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

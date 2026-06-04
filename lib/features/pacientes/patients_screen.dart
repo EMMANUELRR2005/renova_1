@@ -7,6 +7,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import '../../core/auth/permisos.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/app_shell.dart';
+import '../../core/widgets/widgets_comunes.dart';
 import '../../data/mock/mock_data.dart';
 import '../../data/mock/providers.dart';
 import '../../features/auth/providers/auth_provider.dart';
@@ -50,16 +51,17 @@ class _PatientsScreenState extends ConsumerState<PatientsScreen> {
                 Text(
                   'Pacientes',
                   style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w600,
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
                     color: AppColors.textPrimary,
                     fontFamily: GoogleFonts.dmSans().fontFamily,
                   ),
                 ),
                 if (Permisos.puedeCrearPacientes(rol))
-                  ElevatedButton(
+                  ElevatedButton.icon(
                     onPressed: () => context.go('/pacientes/nuevo'),
-                    child: const Text('+ Nuevo Paciente'),
+                    icon: const Icon(Icons.add, size: 18),
+                    label: const Text('Nuevo Paciente'),
                   ),
               ],
             ),
@@ -71,19 +73,10 @@ class _PatientsScreenState extends ConsumerState<PatientsScreen> {
                   child: TextField(
                     controller: _searchController,
                     onChanged: (v) => setState(() => _searchQuery = v.toLowerCase()),
-                    decoration: InputDecoration(
+                    decoration: const InputDecoration(
                       hintText: 'Buscar por nombre o teléfono...',
-                      prefixIcon: const Icon(Icons.search, size: 18),
-                      contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 10),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                        borderSide: const BorderSide(color: AppColors.border),
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                        borderSide: const BorderSide(color: AppColors.border),
-                      ),
+                      prefixIcon: Icon(Icons.search, size: 18),
+                      isDense: true,
                     ),
                   ),
                 ),
@@ -132,18 +125,18 @@ class _PatientsScreenState extends ConsumerState<PatientsScreen> {
                   decoration: BoxDecoration(
                     color: AppColors.card,
                     border: Border.all(color: AppColors.border),
-                    borderRadius: BorderRadius.circular(10),
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: kSombraSuave,
                   ),
+                  clipBehavior: Clip.antiAlias,
                   child: Column(
                     children: [
                       // Encabezado tabla
                       Container(
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 16, vertical: 10),
+                            horizontal: 16, vertical: 12),
                         decoration: const BoxDecoration(
                           color: AppColors.bgGeneral,
-                          borderRadius: BorderRadius.vertical(
-                              top: Radius.circular(10)),
                         ),
                         child: Row(
                           children: [
@@ -174,14 +167,10 @@ class _PatientsScreenState extends ConsumerState<PatientsScreen> {
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 16, vertical: 10),
                             decoration: BoxDecoration(
-                              color: i.isEven ? Colors.white : AppColors.bgGeneral.withOpacity(0.4),
-                              border: Border(
+                              color: i.isEven ? Colors.white : AppColors.bgGeneral.withValues(alpha: 0.4),
+                              border: const Border(
                                 bottom: BorderSide(color: AppColors.border),
                               ),
-                              borderRadius: i == filtrados.length - 1
-                                  ? const BorderRadius.vertical(
-                                      bottom: Radius.circular(10))
-                                  : BorderRadius.zero,
                             ),
                             child: Row(
                               children: [
@@ -194,8 +183,8 @@ class _PatientsScreenState extends ConsumerState<PatientsScreen> {
                                     shape: BoxShape.circle,
                                     color: Colors.grey[200],
                                     border: Border.all(
-                                      color: AppColors.primary.withOpacity(0.3),
-                                      width: 1,
+                                      color: AppColors.accent.withValues(alpha: 0.5),
+                                      width: 1.5,
                                     ),
                                   ),
                                   child: ClipOval(
@@ -250,7 +239,10 @@ class _PatientsScreenState extends ConsumerState<PatientsScreen> {
                                 ),
                                 Expanded(
                                   flex: 1,
-                                  child: _EstadoBadge(estado: p.estado),
+                                  child: Align(
+                                    alignment: Alignment.centerLeft,
+                                    child: buildBadgeEstado(p.estado),
+                                  ),
                                 ),
                                 Expanded(
                                   flex: 2,
@@ -344,31 +336,6 @@ class _HeaderCell extends StatelessWidget {
   }
 }
 
-class _EstadoBadge extends StatelessWidget {
-  final String estado;
-  const _EstadoBadge({required this.estado});
-
-  @override
-  Widget build(BuildContext context) {
-    final activo = estado == 'activo';
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-      decoration: BoxDecoration(
-        color: activo ? AppColors.successBg : AppColors.dangerBg,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Text(
-        activo ? 'Activo' : 'Inactivo',
-        style: TextStyle(
-          fontSize: 10,
-          fontWeight: FontWeight.w600,
-          color: activo ? AppColors.success : AppColors.danger,
-        ),
-      ),
-    );
-  }
-}
-
 class _FiltroChip extends StatelessWidget {
   final String label;
   final bool activo;
@@ -389,7 +356,7 @@ class _FiltroChip extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
-          color: activo ? color.withOpacity(0.12) : AppColors.bgGeneral,
+          color: activo ? color.withValues(alpha: 0.12) : AppColors.bgGeneral,
           border: Border.all(
               color: activo ? color : AppColors.border),
           borderRadius: BorderRadius.circular(20),

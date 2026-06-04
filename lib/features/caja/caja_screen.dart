@@ -7,12 +7,14 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/app_shell.dart';
+import '../../core/widgets/widgets_comunes.dart';
 import '../../data/mock/providers.dart';
 import '../../data/services/venta_service.dart';
 import '../../data/services/catalogo_service.dart';
 import '../../data/services/paciente_service.dart';
 import '../../data/services/email_service.dart';
 import '../../data/services/farmacia_service.dart';
+import '../../data/services/boutique_service.dart';
 import '../../data/services/cierre_service.dart';
 import '../../data/mock/mock_data.dart' hide Medicamento;
 import '../../features/auth/providers/auth_provider.dart';
@@ -76,8 +78,8 @@ class _CajaScreenState extends ConsumerState<CajaScreen> {
                 Text(
                   'Caja',
                   style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w600,
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
                     color: AppColors.textPrimary,
                     fontFamily: GoogleFonts.dmSans().fontFamily,
                   ),
@@ -218,7 +220,8 @@ class _CajaScreenState extends ConsumerState<CajaScreen> {
       decoration: BoxDecoration(
         color: AppColors.card,
         border: Border.all(color: AppColors.border),
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: kSombraSuave,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -298,7 +301,7 @@ class _CajaScreenState extends ConsumerState<CajaScreen> {
         DataCell(Text(
           '${venta.fechaVenta.hour.toString().padLeft(2, '0')}:${venta.fechaVenta.minute.toString().padLeft(2, '0')}',
         )),
-        DataCell(_buildEstadoBadge(venta.estado)),
+        DataCell(buildBadgeEstado(venta.estado)),
         DataCell(
           Row(
             mainAxisSize: MainAxisSize.min,
@@ -368,36 +371,6 @@ class _CajaScreenState extends ConsumerState<CajaScreen> {
         label,
         style: TextStyle(
           fontSize: 11,
-          fontWeight: FontWeight.w600,
-          color: color,
-        ),
-      ),
-    );
-  }
-
-  Widget _buildEstadoBadge(String estado) {
-    Color color;
-    switch (estado) {
-      case 'pagado':
-        color = AppColors.success;
-        break;
-      case 'anulado':
-        color = AppColors.danger;
-        break;
-      default:
-        color = AppColors.warning;
-    }
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(4),
-      ),
-      child: Text(
-        estado.toUpperCase(),
-        style: TextStyle(
-          fontSize: 10,
           fontWeight: FontWeight.w600,
           color: color,
         ),
@@ -753,35 +726,46 @@ class _ResumenCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
-        border: Border.all(color: color.withValues(alpha: 0.3)),
-        borderRadius: BorderRadius.circular(10),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.border),
+        boxShadow: kSombraSuave,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Icon(icono, size: 18, color: color),
-              const SizedBox(width: 8),
-              Text(
-                titulo,
-                style: TextStyle(
-                  fontSize: 12,
-                  color: color,
-                  fontWeight: FontWeight.w500,
+              Expanded(
+                child: Text(
+                  titulo,
+                  style: const TextStyle(
+                      fontSize: 12,
+                      color: AppColors.textSecondary,
+                      fontWeight: FontWeight.w500),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
+              ),
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(icono, size: 18, color: color),
               ),
             ],
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 12),
           Text(
             valor,
             style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.w700,
+              fontSize: 22,
+              fontWeight: FontWeight.bold,
               color: color,
               fontFamily: GoogleFonts.dmSans().fontFamily,
             ),
@@ -844,6 +828,12 @@ class _NuevoCobroDialogState extends ConsumerState<_NuevoCobroDialog> {
   List<Medicamento> _medResultados = [];
   final _medBuscarCtrl = TextEditingController();
 
+  // Productos de boutique del cobro
+  final List<_ItemBoutique> _itemsBoutique = [];
+  List<ProductoBoutique> _todosBoutique = [];
+  List<ProductoBoutique> _boutiqueResultados = [];
+  final _boutiqueBuscarCtrl = TextEditingController();
+
   String _metodoPago = 'efectivo';
   final _referenciaController = TextEditingController();
   int _cuotas = 3;
@@ -862,7 +852,10 @@ class _NuevoCobroDialogState extends ConsumerState<_NuevoCobroDialog> {
       _items.fold(0.0, (sum, item) => sum + item.monto);
   double get _subtotalMedicamentos =>
       _itemsMed.fold(0.0, (sum, m) => sum + m.subtotal);
-  double get _subtotal => _subtotalServicios + _subtotalMedicamentos;
+  double get _subtotalBoutique =>
+      _itemsBoutique.fold(0.0, (sum, b) => sum + b.subtotal);
+  double get _subtotal =>
+      _subtotalServicios + _subtotalMedicamentos + _subtotalBoutique;
   double get _subtotalSinIva => _subtotal / 1.12;
   double get _iva => _subtotal - _subtotalSinIva;
   double get _total => _subtotal;
@@ -895,6 +888,7 @@ class _NuevoCobroDialogState extends ConsumerState<_NuevoCobroDialog> {
     _emailClienteController.dispose();
     _referenciaController.dispose();
     _medBuscarCtrl.dispose();
+    _boutiqueBuscarCtrl.dispose();
     super.dispose();
   }
 
@@ -913,6 +907,7 @@ class _NuevoCobroDialogState extends ConsumerState<_NuevoCobroDialog> {
       final servicios = await CatalogoService().getServicios();
       final clinicas = await CatalogoService().getClinicas();
       final medicamentos = await FarmaciaService().getMedicamentos();
+      final boutique = await BoutiqueService().getProductos();
       if (mounted) {
         setState(() {
           // Eliminar duplicados por id para evitar el assertion de Dropdown
@@ -920,6 +915,7 @@ class _NuevoCobroDialogState extends ConsumerState<_NuevoCobroDialog> {
           _servicios = _dedupPorId(servicios, (s) => s.id);
           _clinicas = _dedupPorId(clinicas, (c) => c.id);
           _todosMedicamentos = medicamentos;
+          _todosBoutique = boutique;
           _cargandoCatalogos = false;
         });
       }
@@ -1007,6 +1003,73 @@ class _NuevoCobroDialogState extends ConsumerState<_NuevoCobroDialog> {
 
   void _quitarMedicamento(int index) {
     setState(() => _itemsMed.removeAt(index));
+  }
+
+  // ── Boutique en el cobro ────────────────────────────────────────────────
+
+  void _buscarBoutique(String query) {
+    final q = query.trim().toLowerCase();
+    if (q.isEmpty) {
+      setState(() => _boutiqueResultados = []);
+      return;
+    }
+    setState(() {
+      _boutiqueResultados = _todosBoutique.where((p) {
+        return p.nombre.toLowerCase().contains(q) ||
+            p.codigoBarras.contains(query.trim()) ||
+            p.codigoInterno.toLowerCase().contains(q) ||
+            p.talla.toLowerCase().contains(q);
+      }).take(6).toList();
+    });
+  }
+
+  void _agregarBoutiquePorCodigo(String codigo) {
+    final cod = codigo.trim();
+    if (cod.isEmpty) return;
+    ProductoBoutique? prod;
+    for (final p in _todosBoutique) {
+      if (p.codigoBarras == cod) {
+        prod = p;
+        break;
+      }
+    }
+    if (prod != null) {
+      _agregarBoutique(prod);
+      _boutiqueBuscarCtrl.clear();
+      setState(() => _boutiqueResultados = []);
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Código no encontrado: $cod'),
+          backgroundColor: AppColors.warning,
+        ),
+      );
+    }
+  }
+
+  void _agregarBoutique(ProductoBoutique prod) {
+    final idx = _itemsBoutique.indexWhere((i) => i.productoId == prod.id);
+    setState(() {
+      if (idx >= 0) {
+        if (_itemsBoutique[idx].cantidad < prod.cantidad) {
+          _itemsBoutique[idx].cantidad++;
+        }
+      } else {
+        _itemsBoutique.add(_ItemBoutique(
+          productoId: prod.id,
+          nombre: prod.nombre,
+          precioUnitario: prod.precioVenta,
+          stockDisponible: prod.cantidad,
+          talla: prod.talla,
+        ));
+      }
+      _boutiqueBuscarCtrl.clear();
+      _boutiqueResultados = [];
+    });
+  }
+
+  void _quitarBoutique(int index) {
+    setState(() => _itemsBoutique.removeAt(index));
   }
 
   Future<void> _buscarPacientes(String query) async {
@@ -1422,6 +1485,10 @@ class _NuevoCobroDialogState extends ConsumerState<_NuevoCobroDialog> {
 
         const Divider(thickness: 1, height: 32),
 
+        _buildSeccionBoutique(),
+
+        const Divider(thickness: 1, height: 32),
+
         _buildTotales(),
       ],
     );
@@ -1666,6 +1733,143 @@ class _NuevoCobroDialogState extends ConsumerState<_NuevoCobroDialog> {
     );
   }
 
+  Widget _buildSeccionBoutique() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            const Icon(Icons.checkroom, size: 18, color: AppColors.primary),
+            const SizedBox(width: 8),
+            const Text(
+              'Boutique (opcional)',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+            ),
+            const Spacer(),
+            if (_itemsBoutique.isNotEmpty)
+              Text(
+                '${_itemsBoutique.length} producto${_itemsBoutique.length > 1 ? 's' : ''}',
+                style: const TextStyle(color: AppColors.textSecondary),
+              ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        TextFormField(
+          controller: _boutiqueBuscarCtrl,
+          decoration: const InputDecoration(
+            hintText: 'Buscar producto o escanear código...',
+            prefixIcon: Icon(Icons.search),
+            suffixIcon: Icon(Icons.barcode_reader),
+            border: OutlineInputBorder(),
+            isDense: true,
+          ),
+          onChanged: _buscarBoutique,
+          onFieldSubmitted: _agregarBoutiquePorCodigo,
+        ),
+        if (_boutiqueResultados.isNotEmpty)
+          Container(
+            margin: const EdgeInsets.only(top: 8),
+            decoration: BoxDecoration(
+              border: Border.all(color: AppColors.border),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Column(
+              children: _boutiqueResultados.map((prod) {
+                final agotado = prod.cantidad <= 0;
+                return ListTile(
+                  dense: true,
+                  leading: const Icon(Icons.checkroom_outlined,
+                      color: AppColors.primary),
+                  title: Text(prod.nombre),
+                  subtitle: Text(
+                    '${prod.talla != 'N/A' ? 'Talla: ${prod.talla} · ' : ''}'
+                    'Stock: ${prod.cantidad} · Q ${prod.precioVenta.toStringAsFixed(2)}',
+                    style: const TextStyle(fontSize: 11),
+                  ),
+                  trailing: agotado
+                      ? const Text('Agotado',
+                          style: TextStyle(
+                              color: AppColors.danger,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600))
+                      : IconButton(
+                          icon: const Icon(Icons.add_circle,
+                              color: AppColors.primary),
+                          onPressed: () => _agregarBoutique(prod),
+                        ),
+                );
+              }).toList(),
+            ),
+          ),
+        ..._itemsBoutique
+            .asMap()
+            .entries
+            .map((e) => _buildItemBoutiqueCard(e.key, e.value)),
+      ],
+    );
+  }
+
+  Widget _buildItemBoutiqueCard(int index, _ItemBoutique item) {
+    return Card(
+      margin: const EdgeInsets.only(top: 8),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        child: Row(
+          children: [
+            const Icon(Icons.checkroom, size: 18, color: AppColors.primary),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(item.nombre,
+                      style: const TextStyle(
+                          fontSize: 13, fontWeight: FontWeight.w600)),
+                  Text(
+                      '${item.talla != 'N/A' ? 'Talla ${item.talla} · ' : ''}'
+                      'Q ${item.precioUnitario.toStringAsFixed(2)} c/u · stock ${item.stockDisponible}',
+                      style: const TextStyle(
+                          fontSize: 11, color: AppColors.textSecondary)),
+                ],
+              ),
+            ),
+            IconButton(
+              visualDensity: VisualDensity.compact,
+              icon: const Icon(Icons.remove_circle_outline, size: 20),
+              onPressed: item.cantidad > 1
+                  ? () => setState(() => item.cantidad--)
+                  : null,
+            ),
+            Text('${item.cantidad}',
+                style: const TextStyle(fontWeight: FontWeight.w600)),
+            IconButton(
+              visualDensity: VisualDensity.compact,
+              icon: const Icon(Icons.add_circle_outline, size: 20),
+              onPressed: item.cantidad < item.stockDisponible
+                  ? () => setState(() => item.cantidad++)
+                  : null,
+            ),
+            const SizedBox(width: 8),
+            SizedBox(
+              width: 72,
+              child: Text(
+                'Q ${item.subtotal.toStringAsFixed(2)}',
+                textAlign: TextAlign.right,
+                style: const TextStyle(fontWeight: FontWeight.w700),
+              ),
+            ),
+            IconButton(
+              visualDensity: VisualDensity.compact,
+              icon: const Icon(Icons.delete_outline,
+                  size: 20, color: AppColors.danger),
+              onPressed: () => _quitarBoutique(index),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildTotales() {
     return Container(
       padding: const EdgeInsets.all(16),
@@ -1867,6 +2071,29 @@ class _NuevoCobroDialogState extends ConsumerState<_NuevoCobroDialog> {
                       ),
                     )),
               ],
+              if (_itemsBoutique.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                const Text(
+                  'Boutique:',
+                  style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                ),
+                const SizedBox(height: 8),
+                ..._itemsBoutique.map((b) => Padding(
+                      padding: const EdgeInsets.only(left: 8, bottom: 4),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.checkroom,
+                              size: 16, color: AppColors.primary),
+                          const SizedBox(width: 8),
+                          Expanded(child: Text('${b.nombre} (x${b.cantidad})')),
+                          Text(
+                            'Q ${b.subtotal.toStringAsFixed(2)}',
+                            style: const TextStyle(fontWeight: FontWeight.w600),
+                          ),
+                        ],
+                      ),
+                    )),
+              ],
               const Divider(),
               _ConfirmRow('Subtotal', 'Q ${_subtotalSinIva.toStringAsFixed(2)}'),
               _ConfirmRow('IVA (12%)', 'Q ${_iva.toStringAsFixed(2)}'),
@@ -1946,7 +2173,9 @@ class _NuevoCobroDialogState extends ConsumerState<_NuevoCobroDialog> {
             .where((i) => i.servicioId.isNotEmpty && i.monto > 0)
             .toList();
         // Debe haber al menos un servicio válido o un medicamento.
-        return serviciosValidos.isNotEmpty || _itemsMed.isNotEmpty;
+        return serviciosValidos.isNotEmpty ||
+            _itemsMed.isNotEmpty ||
+            _itemsBoutique.isNotEmpty;
       case 3:
         return true;
       default:
@@ -1960,6 +2189,7 @@ class _NuevoCobroDialogState extends ConsumerState<_NuevoCobroDialog> {
     try {
       final usuario = ref.read(usuarioActivoProvider);
       final farmaciaService = FarmaciaService();
+      final boutiqueService = BoutiqueService();
 
       // 1. Validar stock disponible ANTES de cobrar (estado actual del inventario)
       if (_itemsMed.isNotEmpty) {
@@ -1976,6 +2206,24 @@ class _NuevoCobroDialogState extends ConsumerState<_NuevoCobroDialog> {
           if (disponible < m.cantidad) {
             setState(() => _guardando = false);
             _mostrarErrorStock(m.nombre, disponible);
+            return;
+          }
+        }
+      }
+      if (_itemsBoutique.isNotEmpty) {
+        final actuales = await boutiqueService.getProductos();
+        for (final b in _itemsBoutique) {
+          ProductoBoutique? actual;
+          for (final x in actuales) {
+            if (x.id == b.productoId) {
+              actual = x;
+              break;
+            }
+          }
+          final disponible = actual?.cantidad ?? 0;
+          if (disponible < b.cantidad) {
+            setState(() => _guardando = false);
+            _mostrarErrorStock(b.nombre, disponible);
             return;
           }
         }
@@ -2001,7 +2249,21 @@ class _NuevoCobroDialogState extends ConsumerState<_NuevoCobroDialog> {
                 monto: m.subtotal,
               ))
           .toList();
-      final itemsCombinados = [...serviciosValidos, ...medComoItems];
+      final boutiqueComoItems = _itemsBoutique
+          .map((b) => ItemVenta(
+                servicioId: b.productoId,
+                servicio: '${b.nombre} (x${b.cantidad})',
+                clinicaId: _clinicaId ?? '',
+                clinica: _clinicaNombre ?? '',
+                descripcion: 'Boutique',
+                monto: b.subtotal,
+              ))
+          .toList();
+      final itemsCombinados = [
+        ...serviciosValidos,
+        ...medComoItems,
+        ...boutiqueComoItems
+      ];
 
       // Datos del cliente: paciente registrado o cliente externo.
       final esPacienteReg = _esPaciente && _pacienteSeleccionado != null;
@@ -2026,9 +2288,19 @@ class _NuevoCobroDialogState extends ConsumerState<_NuevoCobroDialog> {
       // Tipo de venta para reportes.
       final hayServicios = serviciosValidos.isNotEmpty;
       final hayMeds = _itemsMed.isNotEmpty;
-      final tipoVenta = hayServicios && hayMeds
-          ? 'mixta'
-          : (hayMeds ? 'farmacia' : 'servicio');
+      final hayBoutique = _itemsBoutique.isNotEmpty;
+      final tiposPresentes =
+          [hayServicios, hayMeds, hayBoutique].where((b) => b).length;
+      final String tipoVenta;
+      if (tiposPresentes > 1) {
+        tipoVenta = 'mixta';
+      } else if (hayBoutique) {
+        tipoVenta = 'boutique';
+      } else if (hayMeds) {
+        tipoVenta = 'farmacia';
+      } else {
+        tipoVenta = 'servicio';
+      }
 
       final venta = Venta(
         id: '',
@@ -2066,6 +2338,18 @@ class _NuevoCobroDialogState extends ConsumerState<_NuevoCobroDialog> {
           medicamentoId: m.medicamentoId,
           nombreMedicamento: m.nombre,
           cantidad: m.cantidad,
+          ventaId: ventaId,
+          uid: usuario?.id ?? '',
+          nombreResponsable: usuario?.nombre ?? '',
+        );
+      }
+
+      // 3b. Descontar productos de boutique del inventario.
+      for (final b in _itemsBoutique) {
+        await boutiqueService.descontarPorVenta(
+          productoId: b.productoId,
+          nombreProducto: b.nombre,
+          cantidad: b.cantidad,
           ventaId: ventaId,
           uid: usuario?.id ?? '',
           nombreResponsable: usuario?.nombre ?? '',
@@ -2258,6 +2542,27 @@ class _ItemMed {
     required this.codigoBarras,
     required this.precioUnitario,
     required this.stockDisponible,
+    this.cantidad = 1,
+  });
+
+  double get subtotal => precioUnitario * cantidad;
+}
+
+/// Línea de producto de boutique dentro de un cobro.
+class _ItemBoutique {
+  final String productoId;
+  final String nombre;
+  final double precioUnitario;
+  final int stockDisponible;
+  final String talla;
+  int cantidad;
+
+  _ItemBoutique({
+    required this.productoId,
+    required this.nombre,
+    required this.precioUnitario,
+    required this.stockDisponible,
+    this.talla = 'N/A',
     this.cantidad = 1,
   });
 

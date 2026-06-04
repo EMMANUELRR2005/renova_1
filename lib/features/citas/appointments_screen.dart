@@ -6,6 +6,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../core/auth/permisos.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/app_shell.dart';
+import '../../core/widgets/widgets_comunes.dart';
 import '../../data/mock/mock_data.dart';
 import '../../data/mock/providers.dart';
 import '../../features/auth/providers/auth_provider.dart';
@@ -41,8 +42,8 @@ class AppointmentsScreen extends ConsumerWidget {
                       ? 'Mis Citas Asignadas'
                       : 'Gestión de Citas',
                   style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w600,
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
                     color: AppColors.textPrimary,
                     fontFamily: GoogleFonts.dmSans().fontFamily,
                   ),
@@ -108,7 +109,8 @@ class AppointmentsScreen extends ConsumerWidget {
                     decoration: BoxDecoration(
                       color: AppColors.card,
                       border: Border.all(color: AppColors.border),
-                      borderRadius: BorderRadius.circular(10),
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: kSombraSuave,
                     ),
                     child: Center(
                       child: Column(
@@ -143,8 +145,10 @@ class AppointmentsScreen extends ConsumerWidget {
       decoration: BoxDecoration(
         color: AppColors.card,
         border: Border.all(color: AppColors.border),
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: kSombraSuave,
       ),
+      clipBehavior: Clip.antiAlias,
       child: Column(
         children: [
           // Encabezado
@@ -161,7 +165,7 @@ class AppointmentsScreen extends ConsumerWidget {
                 _HeaderCell('Servicio', flex: 2),
                 _HeaderCell('Clínica', flex: 2),
                 _HeaderCell('Doctora', flex: 2),
-                _HeaderCell('Estado', flex: 1),
+                _HeaderCell('Estado', flex: 2),
                 if (Permisos.puedeGestionarCitas(rol))
                   _HeaderCell('Acciones', flex: 2),
               ],
@@ -213,7 +217,9 @@ class AppointmentsScreen extends ConsumerWidget {
               children: [
                 Text(cita.nombrePaciente,
                     style: const TextStyle(
-                        fontSize: 12, fontWeight: FontWeight.w500)),
+                        fontSize: 12, fontWeight: FontWeight.w500),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis),
                 if (cita.motivo.isNotEmpty)
                   Text(cita.motivo,
                       style: const TextStyle(
@@ -224,53 +230,66 @@ class AppointmentsScreen extends ConsumerWidget {
           ),
           Expanded(
             flex: 2,
-            child: Text(cita.servicio, style: const TextStyle(fontSize: 12)),
+            child: Text(cita.servicio,
+                style: const TextStyle(fontSize: 12),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis),
           ),
           Expanded(
             flex: 2,
-            child: Text(cita.clinica, style: const TextStyle(fontSize: 12)),
+            child: Text(cita.clinica,
+                style: const TextStyle(fontSize: 12),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis),
           ),
           Expanded(
             flex: 2,
             child: Text(cita.doctora ?? '—',
-                style: const TextStyle(fontSize: 12)),
+                style: const TextStyle(fontSize: 12),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis),
           ),
           Expanded(
-            flex: 1,
-            child: _EstadoBadge(estado: cita.estado),
+            flex: 2,
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: buildBadgeEstado(cita.estado),
+            ),
           ),
           if (Permisos.puedeGestionarCitas(rol))
             Expanded(
               flex: 2,
               child: Row(
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   if (cita.estado == 'pendiente') ...[
-                    IconButton(
-                      icon: const Icon(Icons.check_circle_outline,
-                          color: AppColors.success, size: 18),
-                      tooltip: 'Confirmar',
-                      onPressed: () => _confirmarCita(context, ref, cita),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.cancel_outlined,
-                          color: AppColors.danger, size: 18),
-                      tooltip: 'Cancelar',
-                      onPressed: () =>
-                          _mostrarDialogCancelar(context, ref, cita),
-                    ),
+                    _accionIcon(Icons.check_circle_outline, AppColors.success,
+                        'Confirmar', () => _confirmarCita(context, ref, cita)),
+                    _accionIcon(Icons.cancel_outlined, AppColors.danger,
+                        'Cancelar',
+                        () => _mostrarDialogCancelar(context, ref, cita)),
                   ],
                   if (cita.estado == 'confirmada')
-                    IconButton(
-                      icon: const Icon(Icons.check_circle,
-                          color: AppColors.clinicalGreen, size: 18),
-                      tooltip: 'Completar',
-                      onPressed: () => _completarCita(context, ref, cita),
-                    ),
+                    _accionIcon(Icons.check_circle, AppColors.clinicalGreen,
+                        'Completar', () => _completarCita(context, ref, cita)),
                 ],
               ),
             ),
         ],
       ),
+    );
+  }
+
+  Widget _accionIcon(
+      IconData icon, Color color, String tooltip, VoidCallback onTap) {
+    return IconButton(
+      icon: Icon(icon, color: color, size: 18),
+      tooltip: tooltip,
+      visualDensity: VisualDensity.compact,
+      padding: EdgeInsets.zero,
+      constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+      onPressed: onTap,
     );
   }
 
@@ -954,57 +973,6 @@ class _HeaderCell extends StatelessWidget {
           fontWeight: FontWeight.w600,
           color: AppColors.textPrimary,
           fontFamily: GoogleFonts.dmSans().fontFamily,
-        ),
-      ),
-    );
-  }
-}
-
-class _EstadoBadge extends StatelessWidget {
-  final String estado;
-  const _EstadoBadge({required this.estado});
-
-  @override
-  Widget build(BuildContext context) {
-    Color color;
-    Color bgColor;
-    String label;
-
-    switch (estado) {
-      case 'confirmada':
-        color = AppColors.success;
-        bgColor = AppColors.successBg;
-        label = 'Confirmada';
-        break;
-      case 'cancelada':
-        color = AppColors.danger;
-        bgColor = AppColors.dangerBg;
-        label = 'Cancelada';
-        break;
-      case 'completada':
-        color = AppColors.clinicalGreen;
-        bgColor = AppColors.clinicalGreenBg;
-        label = 'Completada';
-        break;
-      case 'pendiente':
-      default:
-        color = AppColors.warning;
-        bgColor = AppColors.warningBg;
-        label = 'Pendiente';
-    }
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-      decoration: BoxDecoration(
-        color: bgColor,
-        borderRadius: BorderRadius.circular(4),
-      ),
-      child: Text(
-        label,
-        style: TextStyle(
-          fontSize: 10,
-          fontWeight: FontWeight.w600,
-          color: color,
         ),
       ),
     );

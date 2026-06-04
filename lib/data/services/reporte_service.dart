@@ -186,9 +186,14 @@ class ReporteService {
   bool _esItemFarmacia(Map item) {
     final desc = (item['descripcion'] ?? '').toString().toLowerCase();
     if (desc == 'medicamento') return true;
+    if (desc == 'boutique') return false;
+    // Ítems antiguos sin descripción: el patrón (xN) indicaba farmacia.
     final serv = (item['servicio'] ?? '').toString();
     return RegExp(r'\(x\d+\)').hasMatch(serv);
   }
+
+  bool _esItemBoutique(Map item) =>
+      (item['descripcion'] ?? '').toString().toLowerCase() == 'boutique';
 
   int _unidadesItem(Map item) {
     final serv = (item['servicio'] ?? '').toString();
@@ -211,7 +216,10 @@ class ReporteService {
       for (final raw in items) {
         final item = raw as Map;
         final monto = (item['monto'] ?? 0).toDouble();
-        if (_esItemFarmacia(item)) {
+        if (_esItemBoutique(item)) {
+          // Boutique no cuenta como clínica ni farmacia en estos reportes.
+          continue;
+        } else if (_esItemFarmacia(item)) {
           farmacia += monto;
           unidades += _unidadesItem(item);
         } else {

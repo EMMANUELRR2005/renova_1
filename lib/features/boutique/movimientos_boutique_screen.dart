@@ -5,21 +5,21 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/app_shell.dart';
 import '../../core/widgets/widgets_comunes.dart';
-import '../../data/mock/mock_data.dart' hide Medicamento;
+import '../../data/mock/mock_data.dart';
 import '../../data/mock/providers.dart';
-import '../../data/services/farmacia_service.dart';
+import '../../data/services/boutique_service.dart';
 import '../../features/auth/providers/auth_provider.dart';
 
-class MovimientosFarmaciaScreen extends ConsumerWidget {
-  const MovimientosFarmaciaScreen({super.key});
+class MovimientosBoutiqueScreen extends ConsumerWidget {
+  const MovimientosBoutiqueScreen({super.key});
 
   int _sidebarIndex(RolUsuario? rol) =>
-      rol == RolUsuario.administradora ? 3 : 1;
+      rol == RolUsuario.administradora ? 6 : 1;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final rol = ref.watch(usuarioActivoProvider)?.rol;
-    final movsAsync = ref.watch(movimientosFarmaciaStreamProvider);
+    final movsAsync = ref.watch(movimientosBoutiqueStreamProvider);
 
     return AppShell(
       selectedIndex: _sidebarIndex(rol),
@@ -30,7 +30,7 @@ class MovimientosFarmaciaScreen extends ConsumerWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Movimientos de Farmacia',
+              'Movimientos de Boutique',
               style: TextStyle(
                 fontSize: 24,
                 fontWeight: FontWeight.bold,
@@ -74,9 +74,7 @@ class MovimientosFarmaciaScreen extends ConsumerWidget {
                   ),
                   clipBehavior: Clip.antiAlias,
                   child: Column(
-                    children: movs
-                        .map((m) => _MovimientoRow(mov: m))
-                        .toList(),
+                    children: movs.map((m) => _MovRow(mov: m)).toList(),
                   ),
                 );
               },
@@ -88,17 +86,17 @@ class MovimientosFarmaciaScreen extends ConsumerWidget {
   }
 }
 
-class _MovimientoRow extends StatelessWidget {
-  final MovimientoFarmacia mov;
-  const _MovimientoRow({required this.mov});
+class _MovRow extends StatelessWidget {
+  final MovimientoBoutique mov;
+  const _MovRow({required this.mov});
 
   @override
   Widget build(BuildContext context) {
-    final color = _tipoColor(mov.tipo);
-    final fecha = mov.fecha;
-    final fechaStr = fecha == null
+    final color = _color(mov.tipo);
+    final f = mov.fecha;
+    final fechaStr = f == null
         ? '—'
-        : '${fecha.day.toString().padLeft(2, '0')}/${fecha.month.toString().padLeft(2, '0')}/${fecha.year} ${fecha.hour.toString().padLeft(2, '0')}:${fecha.minute.toString().padLeft(2, '0')}';
+        : '${f.day.toString().padLeft(2, '0')}/${f.month.toString().padLeft(2, '0')}/${f.year} ${f.hour.toString().padLeft(2, '0')}:${f.minute.toString().padLeft(2, '0')}';
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -111,27 +109,29 @@ class _MovimientoRow extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
             decoration: BoxDecoration(
               color: color.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(4),
+              borderRadius: BorderRadius.circular(6),
             ),
-            child: Text(_tipoLabel(mov.tipo),
+            child: Text(mov.tipo.toUpperCase(),
                 style: TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w700,
-                    color: color)),
+                    fontSize: 10, fontWeight: FontWeight.w700, color: color)),
           ),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(mov.nombreMedicamento,
+                Text(mov.nombreProducto,
                     style: const TextStyle(
-                        fontSize: 13, fontWeight: FontWeight.w600)),
+                        fontSize: 13, fontWeight: FontWeight.w600),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis),
                 Text(
                   '${mov.cantidadAnterior} → ${mov.cantidadNueva}'
                   '${mov.motivo.isNotEmpty ? '  ·  ${mov.motivo}' : ''}',
                   style: const TextStyle(
                       fontSize: 11, color: AppColors.textSecondary),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ],
             ),
@@ -158,7 +158,7 @@ class _MovimientoRow extends StatelessWidget {
     );
   }
 
-  Color _tipoColor(String tipo) {
+  Color _color(String tipo) {
     switch (tipo) {
       case 'entrada':
         return AppColors.success;
@@ -169,21 +169,6 @@ class _MovimientoRow extends StatelessWidget {
         return AppColors.warning;
       default:
         return AppColors.neutral;
-    }
-  }
-
-  String _tipoLabel(String tipo) {
-    switch (tipo) {
-      case 'entrada':
-        return 'ENTRADA';
-      case 'salida':
-        return 'SALIDA';
-      case 'venta':
-        return 'VENTA';
-      case 'ajuste':
-        return 'AJUSTE';
-      default:
-        return tipo.toUpperCase();
     }
   }
 }
