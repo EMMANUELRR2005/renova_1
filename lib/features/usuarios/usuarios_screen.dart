@@ -74,7 +74,12 @@ class UsuariosScreen extends ConsumerWidget {
                   ),
                 ),
               ),
-              data: (usuarios) => Container(
+              data: (usuarios) {
+                final usuarioActual = ref.watch(usuarioActivoProvider);
+                final totalAdmins = usuarios
+                    .where((u) => u.rol == RolUsuario.administradora)
+                    .length;
+                return Container(
                 decoration: BoxDecoration(
                   color: AppColors.card,
                   border: Border.all(color: AppColors.border),
@@ -189,17 +194,108 @@ class UsuariosScreen extends ConsumerWidget {
                               ),
                             ],
                           ),
+                          if (usuarioActual != null &&
+                              usuario.id != usuarioActual.id) ...[
+                            const SizedBox(width: 4),
+                            IconButton(
+                              onPressed: () => _confirmarEliminarUsuario(
+                                context,
+                                ref,
+                                usuario,
+                                esUltimoAdmin:
+                                    usuario.rol == RolUsuario.administradora &&
+                                        totalAdmins <= 1,
+                              ),
+                              icon: const Icon(Icons.delete_outline,
+                                  color: AppColors.danger, size: 20),
+                              tooltip: 'Eliminar usuario',
+                              visualDensity: VisualDensity.compact,
+                            ),
+                          ],
                         ],
                       ),
                     );
                   },
                 ),
-              ),
+                );
+              },
             ),
           ],
         ),
       ),
     );
+  }
+
+  // ── Eliminar usuario ────────────────────────────────────────────────────
+
+  Future<void> _confirmarEliminarUsuario(
+    BuildContext context,
+    WidgetRef ref,
+    Usuario usuario, {
+    required bool esUltimoAdmin,
+  }) async {
+    if (esUltimoAdmin) {
+      mostrarSnackbar(context,
+          'No puedes eliminar al último administrador del sistema.',
+          tipo: TipoMensaje.advertencia);
+      return;
+    }
+
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.warning_amber, color: AppColors.danger),
+            SizedBox(width: 8),
+            Expanded(child: Text('Eliminar usuario')),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('¿Eliminar a "${usuario.nombre}"?',
+                style: const TextStyle(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            Text('Email: ${usuario.email}\nRol: ${_getRolLabel(usuario.rol)}',
+                style: const TextStyle(color: AppColors.textSecondary)),
+            const SizedBox(height: 12),
+            const Text(
+              '⚠️ Esta acción elimina el usuario de Firestore y bloquea su '
+              'acceso. No se puede deshacer.',
+              style: TextStyle(color: AppColors.danger, fontSize: 12),
+            ),
+          ],
+        ),
+        actions: [
+          OutlinedButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancelar'),
+          ),
+          ElevatedButton.icon(
+            onPressed: () => Navigator.pop(ctx, true),
+            icon: const Icon(Icons.delete, color: Colors.white, size: 16),
+            label: const Text('Sí, eliminar',
+                style: TextStyle(color: Colors.white)),
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.danger),
+          ),
+        ],
+      ),
+    );
+
+    if (ok != true) return;
+    try {
+      await ref.read(authServiceProvider).eliminarUsuario(usuario.id);
+      if (context.mounted) {
+        mostrarSnackbar(context, 'Usuario ${usuario.nombre} eliminado',
+            tipo: TipoMensaje.exito);
+      }
+    } catch (e) {
+      if (context.mounted) {
+        mostrarSnackbar(context, 'Error: $e', tipo: TipoMensaje.error);
+      }
+    }
   }
 
   Future<void> _toggleUsuario(

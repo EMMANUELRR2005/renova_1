@@ -404,61 +404,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               const SizedBox(height: 32),
 
               const Center(
-                child: Text('Prueba con:',
-                    style: TextStyle(color: Colors.grey, fontSize: 13)),
-              ),
-              const SizedBox(height: 12),
-              _buildCredentialDemo('Admin', 'admin@renova.gt', 'renova2024'),
-              _buildCredentialDemo('Secretaria', 'marcos@renova.gt', 'renova2024'),
-              _buildCredentialDemo('Enfermera', 'carmen@renova.gt', 'renova2024'),
-              _buildCredentialDemo('Doctora', 'maria@renova.gt', 'renova2024'),
-              const SizedBox(height: 16),
-              const Center(
                 child: Text('v1.0.0 · Renova Clínica',
                     style: TextStyle(color: Colors.grey, fontSize: 11)),
               ),
             ],
           ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildCredentialDemo(String role, String email, String password) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        decoration: BoxDecoration(
-          color: AppColors.bgGeneral,
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: AppColors.border),
-        ),
-        child: Row(
-          children: [
-            Text(role,
-                style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.textPrimary)),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text('$email / $password',
-                  style: const TextStyle(
-                      fontSize: 11, color: AppColors.textSecondary),
-                  overflow: TextOverflow.ellipsis),
-            ),
-            TextButton(
-              onPressed: () {
-                _emailController.text = email;
-                _passwordController.text = password;
-              },
-              style: TextButton.styleFrom(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 0)),
-              child: const Text('Usar', style: TextStyle(fontSize: 11)),
-            ),
-          ],
         ),
       ),
     );

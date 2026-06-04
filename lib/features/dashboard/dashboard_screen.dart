@@ -36,6 +36,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   bool _cargando = true;
   Map<String, dynamic> _clinica = {};
   Map<String, dynamic> _farmacia = {};
+  Map<String, dynamic> _boutique = {};
 
   @override
   void initState() {
@@ -85,11 +86,13 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       final res = await Future.wait([
         service.getReporteClinica(desde: r.desde, hasta: r.hasta),
         service.getReporteFarmacia(desde: r.desde, hasta: r.hasta),
+        service.getReporteBoutique(desde: r.desde, hasta: r.hasta),
       ]);
       if (mounted) {
         setState(() {
           _clinica = res[0];
           _farmacia = res[1];
+          _boutique = res[2];
           _cargando = false;
         });
       }
@@ -104,7 +107,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       selectedIndex: 0,
       onNavigate: (_) {},
       child: DefaultTabController(
-        length: 2,
+        length: 3,
         child: Column(
           children: [
             _buildHeader(),
@@ -117,6 +120,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                       children: [
                         _buildTabClinica(),
                         _buildTabFarmacia(),
+                        _buildTabBoutique(),
                       ],
                     ),
             ),
@@ -225,6 +229,16 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                 Icon(Icons.medication_outlined, size: 18),
                 SizedBox(width: 6),
                 Text('Farmacia'),
+              ],
+            ),
+          ),
+          Tab(
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.checkroom_outlined, size: 18),
+                SizedBox(width: 6),
+                Text('Boutique'),
               ],
             ),
           ),
@@ -391,6 +405,99 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                 ),
               ),
             ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── TAB BOUTIQUE ──────────────────────────────────────────────────────────
+
+  Widget _buildTabBoutique() {
+    final b = _boutique;
+    final stockBajo = (b['stockBajo'] ?? 0) as int;
+    final serie = (b['serie6'] as List?)?.cast<double>() ?? List.filled(6, 0.0);
+    final meses6 = (b['meses6'] as List?)?.cast<Map>() ?? [];
+    final porCategoria = (b['porCategoria'] as Map?)?.cast<String, int>() ?? {};
+    final stockCritico =
+        (b['stockCritico'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        children: [
+          if (stockBajo > 0)
+            Container(
+              margin: const EdgeInsets.only(bottom: 16),
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppColors.warningBg,
+                borderRadius: BorderRadius.circular(8),
+                border:
+                    Border.all(color: AppColors.warning.withValues(alpha: 0.4)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.warning_amber, color: AppColors.warning),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      '⚠️ $stockBajo producto(s) con stock bajo en Boutique.',
+                      style: const TextStyle(color: AppColors.warning),
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: () => context.go('/boutique'),
+                    child: const Text('Ver'),
+                  ),
+                ],
+              ),
+            ),
+          Row(
+            children: [
+              _card('Total Productos', '${b['totalProductos'] ?? 0}',
+                  '$stockBajo con stock bajo', Icons.checkroom_outlined,
+                  AppColors.primaryDark),
+              _card(
+                  'Ventas Boutique',
+                  'Q ${NumberFormat('#,##0.00').format(b['ingresos'] ?? 0)}',
+                  _labelPeriodo,
+                  Icons.point_of_sale_outlined,
+                  _dorado),
+              _card('Prendas Vendidas', '${b['unidadesVendidas'] ?? 0}',
+                  'unidades · $_labelPeriodo', Icons.shopping_bag_outlined,
+                  const Color(0xFF8B5CF6)),
+              _card(
+                  'Valor Inventario',
+                  'Q ${NumberFormat('#,##0').format(b['valorInventario'] ?? 0)}',
+                  'al precio de compra',
+                  Icons.inventory_2_outlined,
+                  const Color(0xFF14B8A6),
+                  last: true),
+            ],
+          ),
+          const SizedBox(height: 20),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                flex: 3,
+                child: _chartCard('Ingresos Boutique', 'Últimos 6 meses',
+                    _barChart(serie, meses6, _dorado)),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                flex: 2,
+                child: _chartCard('Ventas por categoría', _labelPeriodo,
+                    _pieFromCounts(porCategoria)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+          _chartCard(
+            '⚠️ Stock Crítico Boutique',
+            'Productos bajo el mínimo',
+            _stockCriticoList(stockCritico),
           ),
         ],
       ),

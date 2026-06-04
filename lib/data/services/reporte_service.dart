@@ -205,23 +205,30 @@ class ReporteService {
     return 1;
   }
 
-  /// Divide una venta en su monto de servicios y su monto de farmacia.
-  ({double servicio, double farmacia, int unidadesFarmacia}) _dividirVenta(
-      Map<String, dynamic> data) {
+  /// Divide una venta en sus montos de servicios, farmacia y boutique.
+  ({
+    double servicio,
+    double farmacia,
+    double boutique,
+    int unidadesFarmacia,
+    int unidadesBoutique
+  }) _dividirVenta(Map<String, dynamic> data) {
     final items = (data['items'] as List?) ?? [];
     double servicio = 0;
     double farmacia = 0;
-    int unidades = 0;
+    double boutique = 0;
+    int unidadesFarm = 0;
+    int unidadesBout = 0;
     if (items.isNotEmpty) {
       for (final raw in items) {
         final item = raw as Map;
         final monto = (item['monto'] ?? 0).toDouble();
         if (_esItemBoutique(item)) {
-          // Boutique no cuenta como clínica ni farmacia en estos reportes.
-          continue;
+          boutique += monto;
+          unidadesBout += _unidadesItem(item);
         } else if (_esItemFarmacia(item)) {
           farmacia += monto;
-          unidades += _unidadesItem(item);
+          unidadesFarm += _unidadesItem(item);
         } else {
           servicio += monto;
         }
@@ -229,13 +236,22 @@ class ReporteService {
     } else {
       // Ventas antiguas sin items: usar tipoVenta.
       final monto = (data['monto'] ?? 0).toDouble();
-      if ((data['tipoVenta'] ?? 'servicio') == 'farmacia') {
+      final tv = (data['tipoVenta'] ?? 'servicio');
+      if (tv == 'farmacia') {
         farmacia += monto;
+      } else if (tv == 'boutique') {
+        boutique += monto;
       } else {
         servicio += monto;
       }
     }
-    return (servicio: servicio, farmacia: farmacia, unidadesFarmacia: unidades);
+    return (
+      servicio: servicio,
+      farmacia: farmacia,
+      boutique: boutique,
+      unidadesFarmacia: unidadesFarm,
+      unidadesBoutique: unidadesBout
+    );
   }
 
   DateTime? _parseFecha(dynamic v) =>
@@ -546,6 +562,170 @@ class ReporteService {
       'meses6': meses6,
       'ultimas': ultimas.take(15).toList(),
       'masVendidos': masVendidos.take(8).toList(),
+      'movimientos': movimientos.take(20).toList(),
+    };
+  }
+
+  /// Reporte completo de BOUTIQUE (inventario y ventas de productos).
+  Future<Map<String, dynamic>> getReporteBoutique({
+    required DateTime desde,
+    required DateTime hasta,
+  }) async {
+    final hoy = DateTime.now();
+
+    // ── Inventario ──
+    final invSnap = await _db.collection('boutique').get();
+    int totalProductos = invSnap.docs.length;
+    int stockBajo = 0, sinStock = 0;
+    double valorInventario = 0;
+    final porCategoria = <String, int>{};
+    final stockCritico = <Map<String, dynamic>>[];
+    // Mapa nombre → datos del producto (para enriquecer "más vendidos").
+    final infoProducto = <String, Map<String, dynamic>>{};
+    for (final d in invSnap.docs) {
+      final data = d.data();
+      final nombre = (data['nombre'] ?? '').toString();
+      final cant = (data['cantidad'] ?? 0) is int
+          ? (data['cantidad'] ?? 0) as int
+          : (data['cantidad'] as num).toInt();
+      final minimo = (data['cantidadMinima'] ?? 0) is int
+          ? (data['cantidadMinima'] ?? 0) as int
+          : (data['cantidadMinima'] as num).toInt();
+      final precioCompra = (data['precioCompra'] ?? 0).toDouble();
+      final precioVenta = (data['precioVenta'] ?? 0).toDouble();
+      valorInventario += cant * precioCompra;
+      final cat = (data['categoria'] ?? 'Otro').toString();
+      porCategoria[cat] = (porCategoria[cat] ?? 0) + 1;
+      if (cant <= 0) {
+        sinStock++;
+      } else if (cant <= minimo) {
+        stockBajo++;
+      }
+      infoProducto[nombre] = {
+        'talla': data['talla'] ?? 'N/A',
+        'color': data['color'] ?? 'N/A',
+        'stock': cant,
+        'precioVenta': precioVenta,
+      };
+      if (cant <= minimo) {
+        stockCritico.add({
+          'nombre': nombre,
+          'talla': data['talla'] ?? 'N/A',
+          'color': data['color'] ?? 'N/A',
+          'cantidad': cant,
+          'minimo': minimo,
+          'estante': data['estante'] ?? '',
+        });
+      }
+    }
+
+    // ── Ventas de boutique ──
+    final ventasSnap = await _db.collection('ventas').get();
+    double ingresos = 0;
+    int countVentas = 0;
+    final porMetodo = <String, double>{'efectivo': 0, 'tarjeta': 0, 'visa_cuotas': 0};
+    final serie6 = List<double>.filled(6, 0);
+    final meses6 = <Map<String, int>>[];
+    for (int i = 5; i >= 0; i--) {
+      final m = DateTime(hoy.year, hoy.month - i, 1);
+      meses6.add({'mes': m.month, 'anio': m.year});
+    }
+    final ultimas = <Map<String, dynamic>>[];
+
+    for (final doc in ventasSnap.docs) {
+      final data = doc.data();
+      if (data['estado'] == 'anulado') continue;
+      final f = _parseFecha(data['fechaVenta']);
+      final split = _dividirVenta(data);
+      if (split.boutique <= 0) continue;
+
+      if (f != null) {
+        for (int i = 0; i < 6; i++) {
+          if (f.year == meses6[i]['anio'] && f.month == meses6[i]['mes']) {
+            serie6[i] += split.boutique;
+          }
+        }
+      }
+
+      if (!_enRango(f, desde, hasta)) continue;
+      ingresos += split.boutique;
+      countVentas++;
+      final mp = (data['metodoPago'] ?? 'efectivo').toString();
+      porMetodo[mp] = (porMetodo[mp] ?? 0) + split.boutique;
+      final items = (data['items'] as List?) ?? [];
+      ultimas.add({
+        'fecha': f ?? DateTime.now(),
+        'cliente': data['nombrePaciente'] ?? '',
+        'producto': items
+            .where((i) => _esItemBoutique(i as Map))
+            .map((i) => (i as Map)['servicio'])
+            .where((s) => (s ?? '').toString().isNotEmpty)
+            .join(', '),
+        'monto': split.boutique,
+        'metodoPago': data['metodoPago'] ?? '',
+      });
+    }
+    ultimas.sort((a, b) =>
+        (b['fecha'] as DateTime).compareTo(a['fecha'] as DateTime));
+
+    // ── Movimientos ──
+    final movSnap = await _db.collection('movimientos_boutique').get();
+    final vendidosPorProd = <String, int>{};
+    int unidadesVendidas = 0;
+    final movimientos = <Map<String, dynamic>>[];
+    for (final d in movSnap.docs) {
+      final data = d.data();
+      final f = _parseFecha(data['fecha']);
+      final tipo = (data['tipo'] ?? '').toString();
+      final cant = (data['cantidad'] ?? 0) is int
+          ? (data['cantidad'] ?? 0) as int
+          : (data['cantidad'] as num?)?.toInt() ?? 0;
+      movimientos.add({
+        'fecha': f ?? DateTime.now(),
+        'producto': data['nombreProducto'] ?? '',
+        'tipo': tipo,
+        'cantidad': cant,
+        'responsable': data['nombreResponsable'] ?? '',
+      });
+      if (tipo == 'venta' && _enRango(f, desde, hasta)) {
+        unidadesVendidas += cant;
+        final nombre = (data['nombreProducto'] ?? '').toString();
+        vendidosPorProd[nombre] = (vendidosPorProd[nombre] ?? 0) + cant;
+      }
+    }
+    movimientos.sort((a, b) =>
+        (b['fecha'] as DateTime).compareTo(a['fecha'] as DateTime));
+
+    final masVendidos = vendidosPorProd.entries.map((e) {
+      final info = infoProducto[e.key] ?? {};
+      final precioVenta = (info['precioVenta'] ?? 0).toDouble();
+      return {
+        'nombre': e.key,
+        'unidades': e.value,
+        'talla': info['talla'] ?? 'N/A',
+        'color': info['color'] ?? 'N/A',
+        'stock': info['stock'] ?? 0,
+        'ingresos': e.value * precioVenta,
+      };
+    }).toList()
+      ..sort((a, b) => (b['unidades'] as int).compareTo(a['unidades'] as int));
+
+    return {
+      'totalProductos': totalProductos,
+      'stockBajo': stockBajo,
+      'sinStock': sinStock,
+      'valorInventario': valorInventario,
+      'porCategoria': porCategoria,
+      'stockCritico': stockCritico,
+      'ingresos': ingresos,
+      'countVentas': countVentas,
+      'ticketPromedio': countVentas > 0 ? ingresos / countVentas : 0.0,
+      'unidadesVendidas': unidadesVendidas,
+      'porMetodo': porMetodo,
+      'serie6': serie6,
+      'meses6': meses6,
+      'ultimas': ultimas.take(15).toList(),
+      'masVendidos': masVendidos.take(10).toList(),
       'movimientos': movimientos.take(20).toList(),
     };
   }

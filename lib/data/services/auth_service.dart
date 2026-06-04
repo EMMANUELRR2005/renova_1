@@ -125,6 +125,13 @@ class AuthService {
     await _db.collection('usuarios').doc(uid).update({'activo': activo});
   }
 
+  /// Elimina el documento del usuario en Firestore (bloquea su acceso a la app).
+  /// Nota: Firebase Auth no permite borrar otras cuentas desde el cliente; la
+  /// cuenta de Auth permanece pero sin documento ya no puede usar el sistema.
+  Future<void> eliminarUsuario(String uid) async {
+    await _db.collection('usuarios').doc(uid).delete();
+  }
+
   Future<Usuario?> getUsuarioActual() async {
     // En el arranque en frío `currentUser` puede ser null momentáneamente
     // mientras Firebase Auth restaura la sesión persistida. Esperamos al primer

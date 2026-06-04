@@ -22,6 +22,7 @@ class _ReportesScreenState extends ConsumerState<ReportesScreen> {
 
   Map<String, dynamic> _clinica = {};
   Map<String, dynamic> _farmacia = {};
+  Map<String, dynamic> _boutique = {};
 
   @override
   void initState() {
@@ -66,11 +67,13 @@ class _ReportesScreenState extends ConsumerState<ReportesScreen> {
       final res = await Future.wait([
         service.getReporteClinica(desde: r.desde, hasta: r.hasta),
         service.getReporteFarmacia(desde: r.desde, hasta: r.hasta),
+        service.getReporteBoutique(desde: r.desde, hasta: r.hasta),
       ]);
       if (mounted) {
         setState(() {
           _clinica = res[0];
           _farmacia = res[1];
+          _boutique = res[2];
           _cargando = false;
         });
       }
@@ -109,7 +112,7 @@ class _ReportesScreenState extends ConsumerState<ReportesScreen> {
       selectedIndex: 2,
       onNavigate: (_) {},
       child: DefaultTabController(
-        length: 2,
+        length: 3,
         child: Column(
           children: [
             _buildHeader(),
@@ -122,6 +125,7 @@ class _ReportesScreenState extends ConsumerState<ReportesScreen> {
                       children: [
                         _buildReportesClinica(),
                         _buildReportesFarmacia(),
+                        _buildReportesBoutique(),
                       ],
                     ),
             ),
@@ -227,6 +231,16 @@ class _ReportesScreenState extends ConsumerState<ReportesScreen> {
                 Icon(Icons.medication_outlined, size: 18),
                 SizedBox(width: 6),
                 Text('Farmacia'),
+              ],
+            ),
+          ),
+          Tab(
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.checkroom_outlined, size: 18),
+                SizedBox(width: 6),
+                Text('Boutique'),
               ],
             ),
           ),
@@ -506,6 +520,169 @@ class _ReportesScreenState extends ConsumerState<ReportesScreen> {
                           DataCell(Text(DateFormat('dd/MM/yy').format(fe))),
                           DataCell(Text(v['cliente'] ?? '')),
                           DataCell(Text(v['medicamento'] ?? '')),
+                          DataCell(Text(
+                              'Q ${(v['monto'] as double).toStringAsFixed(2)}')),
+                          DataCell(_metodoBadge(v['metodoPago'] ?? '')),
+                        ]);
+                      }).toList(),
+                    ),
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── REPORTES BOUTIQUE ──────────────────────────────────────────────────────
+
+  Widget _buildReportesBoutique() {
+    final b = _boutique;
+    final porMetodo = (b['porMetodo'] as Map?)?.cast<String, double>() ?? {};
+    final porCategoria = (b['porCategoria'] as Map?)?.cast<String, int>() ?? {};
+    final masVendidos =
+        (b['masVendidos'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+    final movimientos =
+        (b['movimientos'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+    final ultimas = (b['ultimas'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // 1. Resumen financiero boutique
+          _SeccionCard(
+            titulo: '1. Resumen Financiero — Boutique',
+            child: Column(
+              children: [
+                Row(
+                  children: [
+                    _mini('Ventas boutique',
+                        'Q ${NumberFormat('#,##0.00').format(b['ingresos'] ?? 0)}',
+                        AppColors.clinicalGreen),
+                    _mini('Transacciones', '${b['countVentas'] ?? 0}',
+                        AppColors.primary),
+                    _mini(
+                        'Ticket promedio',
+                        'Q ${NumberFormat('#,##0.00').format(b['ticketPromedio'] ?? 0)}',
+                        _dorado),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                _metodoRow('Efectivo', porMetodo['efectivo'] ?? 0, AppColors.success),
+                _metodoRow('Tarjeta', porMetodo['tarjeta'] ?? 0, AppColors.primary),
+                _metodoRow(
+                    'Visa Cuotas', porMetodo['visa_cuotas'] ?? 0, AppColors.warning),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          // 2. Estadísticas de inventario
+          _SeccionCard(
+            titulo: '2. Estadísticas de Inventario',
+            child: Column(
+              children: [
+                Row(
+                  children: [
+                    _mini('Productos', '${b['totalProductos'] ?? 0}',
+                        AppColors.primary),
+                    _mini(
+                        'Valor inventario',
+                        'Q ${NumberFormat('#,##0').format(b['valorInventario'] ?? 0)}',
+                        AppColors.clinicalGreen),
+                    _mini('Stock crítico', '${b['stockBajo'] ?? 0}',
+                        AppColors.danger),
+                    _mini('Prendas vendidas', '${b['unidadesVendidas'] ?? 0}',
+                        _dorado),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                _tablaConteo('Productos por Categoría', porCategoria, 'Categoría'),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          // 3. Productos más vendidos
+          _SeccionCard(
+            titulo: '3. Productos Más Vendidos',
+            child: masVendidos.isEmpty
+                ? _sinDatos()
+                : SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: DataTable(
+                      columns: const [
+                        DataColumn(label: Text('Producto')),
+                        DataColumn(label: Text('Talla')),
+                        DataColumn(label: Text('Color')),
+                        DataColumn(label: Text('Vendidos')),
+                        DataColumn(label: Text('Ingresos')),
+                        DataColumn(label: Text('Stock')),
+                      ],
+                      rows: masVendidos.map((m) {
+                        return DataRow(cells: [
+                          DataCell(Text(m['nombre'] ?? '')),
+                          DataCell(Text('${m['talla'] ?? 'N/A'}')),
+                          DataCell(Text('${m['color'] ?? 'N/A'}')),
+                          DataCell(Text('${m['unidades']}')),
+                          DataCell(Text(
+                              'Q ${(m['ingresos'] as num).toStringAsFixed(2)}')),
+                          DataCell(Text('${m['stock']}')),
+                        ]);
+                      }).toList(),
+                    ),
+                  ),
+          ),
+          const SizedBox(height: 16),
+          // 4. Movimientos de inventario
+          _SeccionCard(
+            titulo: '4. Movimientos de Inventario',
+            child: movimientos.isEmpty
+                ? _sinDatos()
+                : SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: DataTable(
+                      columns: const [
+                        DataColumn(label: Text('Fecha')),
+                        DataColumn(label: Text('Producto')),
+                        DataColumn(label: Text('Tipo')),
+                        DataColumn(label: Text('Cantidad')),
+                        DataColumn(label: Text('Responsable')),
+                      ],
+                      rows: movimientos.map((m) {
+                        final fe = m['fecha'] as DateTime;
+                        return DataRow(cells: [
+                          DataCell(Text(DateFormat('dd/MM/yy HH:mm').format(fe))),
+                          DataCell(Text(m['producto'] ?? '')),
+                          DataCell(_tipoMovBadge(m['tipo'] ?? '')),
+                          DataCell(Text('${m['cantidad']}')),
+                          DataCell(Text(m['responsable'] ?? '')),
+                        ]);
+                      }).toList(),
+                    ),
+                  ),
+          ),
+          const SizedBox(height: 16),
+          // 5. Detalle de ventas boutique
+          _SeccionCard(
+            titulo: '5. Detalle de Ventas — Boutique',
+            child: ultimas.isEmpty
+                ? _sinDatos()
+                : SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: DataTable(
+                      columns: const [
+                        DataColumn(label: Text('Fecha')),
+                        DataColumn(label: Text('Cliente')),
+                        DataColumn(label: Text('Producto')),
+                        DataColumn(label: Text('Monto')),
+                        DataColumn(label: Text('Método')),
+                      ],
+                      rows: ultimas.map((v) {
+                        final fe = v['fecha'] as DateTime;
+                        return DataRow(cells: [
+                          DataCell(Text(DateFormat('dd/MM/yy').format(fe))),
+                          DataCell(Text(v['cliente'] ?? '')),
+                          DataCell(Text(v['producto'] ?? '')),
                           DataCell(Text(
                               'Q ${(v['monto'] as double).toStringAsFixed(2)}')),
                           DataCell(_metodoBadge(v['metodoPago'] ?? '')),
