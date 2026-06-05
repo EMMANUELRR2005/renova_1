@@ -449,6 +449,31 @@ class _EstadoBadge extends StatelessWidget {
   }
 }
 
+class _EstadoCobroBadge extends StatelessWidget {
+  final String estado;
+  const _EstadoCobroBadge({required this.estado});
+
+  @override
+  Widget build(BuildContext context) {
+    final cobrado = estado == 'cobrado';
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: cobrado ? AppColors.successBg : AppColors.warning.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Text(
+        cobrado ? '✅ Cobrado' : '⏳ Pendiente cobro',
+        style: TextStyle(
+          fontSize: 10,
+          fontWeight: FontWeight.w600,
+          color: cobrado ? AppColors.success : AppColors.warning,
+        ),
+      ),
+    );
+  }
+}
+
 class _HistorialCard extends StatefulWidget {
   final HistorialConsulta entrada;
   final Paciente? paciente;
@@ -515,6 +540,10 @@ class _HistorialCardState extends State<_HistorialCard> {
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
+                  if (h.estado == 'pendiente_cobro' || h.estado == 'cobrado') ...[
+                    _EstadoCobroBadge(estado: h.estado),
+                    const SizedBox(width: 8),
+                  ],
                   Icon(
                     _expandido ? Icons.expand_less : Icons.expand_more,
                     size: 18,
@@ -543,6 +572,53 @@ class _HistorialCardState extends State<_HistorialCard> {
                               _DetailRow('Diagnóstico', h.diagnostico),
                             if (h.tratamiento.isNotEmpty)
                               _DetailRow('Tratamiento', h.tratamiento),
+                            if (h.procedimientos.isNotEmpty) ...[
+                              const SizedBox(height: 6),
+                              const Text('Procedimientos realizados:',
+                                  style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600)),
+                              const SizedBox(height: 4),
+                              ...h.procedimientos.map((p) => Padding(
+                                    padding: const EdgeInsets.only(
+                                        left: 12, bottom: 2),
+                                    child: Row(
+                                      children: [
+                                        Expanded(
+                                          child: Text(
+                                            '• ${p['nombre'] ?? ''}'
+                                            '${(p['descripcion'] ?? '').toString().isNotEmpty ? ' — ${p['descripcion']}' : ''}',
+                                            style: const TextStyle(fontSize: 12),
+                                          ),
+                                        ),
+                                        Text(
+                                          'Q ${((p['precio'] as num?) ?? 0).toStringAsFixed(2)}',
+                                          style: const TextStyle(
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.w600),
+                                        ),
+                                      ],
+                                    ),
+                                  )),
+                              Padding(
+                                padding: const EdgeInsets.only(left: 12, top: 4),
+                                child: Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    if (h.estado.isNotEmpty)
+                                      _EstadoCobroBadge(estado: h.estado),
+                                    Text(
+                                      'Total: Q ${h.totalEstimado.toStringAsFixed(2)}',
+                                      style: const TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.bold,
+                                          color: AppColors.primary),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
                             if (h.comentarios.isNotEmpty)
                               _DetailRow('Comentarios', h.comentarios),
                             if (h.doctora.isNotEmpty)
@@ -579,6 +655,7 @@ class _HistorialCardState extends State<_HistorialCard> {
   Color _tipoColor(String tipo) {
     switch (tipo) {
       case 'consulta':
+      case 'consulta_medica':
         return AppColors.primary;
       case 'nota_medica':
         return AppColors.clinicalGreen;
@@ -599,6 +676,8 @@ class _HistorialCardState extends State<_HistorialCard> {
     switch (tipo) {
       case 'consulta':
         return 'Consulta';
+      case 'consulta_medica':
+        return 'Consulta Médica';
       case 'nota_medica':
         return 'Nota Médica';
       case 'procedimiento':
@@ -624,6 +703,13 @@ class _HistorialCardState extends State<_HistorialCard> {
     if (h.tipo == 'receta_medica') {
       final n = h.numeroReceta.isNotEmpty ? '${h.numeroReceta} · ' : '';
       return '$n${h.diagnostico.isNotEmpty ? h.diagnostico : 'Receta médica'}';
+    }
+    if (h.procedimientos.isNotEmpty) {
+      final nombres = h.procedimientos
+          .map((p) => (p['nombre'] ?? '').toString())
+          .where((s) => s.isNotEmpty)
+          .join(' + ');
+      return '$nombres · Q ${h.totalEstimado.toStringAsFixed(2)}';
     }
     if (h.motivo.isNotEmpty) return h.motivo;
     if (h.comentarios.isNotEmpty) return h.comentarios;

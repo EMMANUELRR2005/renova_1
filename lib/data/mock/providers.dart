@@ -10,6 +10,7 @@ import '../services/sesion_service.dart';
 import '../services/usuario_service.dart';
 import '../services/catalogo_service.dart';
 import '../services/venta_service.dart';
+import '../services/consulta_cobro_service.dart';
 import '../services/expediente_service.dart';
 import '../services/reporte_service.dart';
 import '../services/farmacia_service.dart';
@@ -287,6 +288,17 @@ final todasCitasMedicasStreamProvider = StreamProvider<List<CitaMedica>>((ref) {
 // ============================================================================
 
 final ventaServiceProvider = Provider((ref) => VentaService());
+
+final consultaCobroServiceProvider =
+    Provider((ref) => ConsultaCobroService());
+
+/// Stream de consultas de la doctora pendientes de cobro (para la caja).
+final consultasPendientesCobroProvider =
+    StreamProvider<List<ConsultaPendiente>>((ref) {
+  final usuario = ref.watch(usuarioActivoProvider);
+  if (usuario == null) return const Stream.empty();
+  return ref.watch(consultaCobroServiceProvider).streamPendientes();
+});
 
 final filtroVentasProvider = StateProvider<String>((ref) => 'hoy');
 

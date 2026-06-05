@@ -807,6 +807,13 @@ class HistorialConsulta {
   final String nota;
   // Receta médica
   final String numeroReceta;
+  // Procedimientos realizados por la doctora (van a caja para cobro)
+  final List<Map<String, dynamic>> procedimientos;
+  final double totalEstimado;
+  final String estado; // pendiente_cobro | cobrado (para consulta_medica)
+  final String consultaId;
+  final String notasPrivadas;
+  final String notasParaCaja;
 
   HistorialConsulta({
     required this.id,
@@ -835,6 +842,12 @@ class HistorialConsulta {
     this.nombreEnfermera = '',
     this.nota = '',
     this.numeroReceta = '',
+    this.procedimientos = const [],
+    this.totalEstimado = 0,
+    this.estado = '',
+    this.consultaId = '',
+    this.notasPrivadas = '',
+    this.notasParaCaja = '',
   });
 
   Map<String, dynamic> toMap() => {
@@ -895,6 +908,15 @@ class HistorialConsulta {
       nombreEnfermera: map['nombreEnfermera'] ?? '',
       nota: map['nota'] ?? '',
       numeroReceta: map['numeroReceta'] ?? '',
+      procedimientos: (map['procedimientos'] as List?)
+              ?.map((p) => Map<String, dynamic>.from(p as Map))
+              .toList() ??
+          [],
+      totalEstimado: (map['totalEstimado'] ?? 0).toDouble(),
+      estado: map['estado'] ?? '',
+      consultaId: map['consultaId'] ?? '',
+      notasPrivadas: map['notasPrivadas'] ?? '',
+      notasParaCaja: map['notasParaCaja'] ?? '',
     );
   }
 }

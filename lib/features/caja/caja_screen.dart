@@ -10,6 +10,7 @@ import '../../core/widgets/app_shell.dart';
 import '../../core/widgets/widgets_comunes.dart';
 import '../../data/mock/providers.dart';
 import '../../data/services/venta_service.dart';
+import '../../data/services/consulta_cobro_service.dart';
 import '../../data/services/catalogo_service.dart';
 import '../../data/services/paciente_service.dart';
 import '../../data/services/email_service.dart';
@@ -113,6 +114,7 @@ class _CajaScreenState extends ConsumerState<CajaScreen> {
             const SizedBox(height: 20),
             _buildResumenDia(),
             const SizedBox(height: 20),
+            _buildPendientesCobro(),
             _buildListaVentas(ventasAsync),
           ],
         ),
@@ -212,6 +214,134 @@ class _CajaScreenState extends ConsumerState<CajaScreen> {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildPendientesCobro() {
+    final pendientesAsync = ref.watch(consultasPendientesCobroProvider);
+    return pendientesAsync.maybeWhen(
+      data: (pendientes) {
+        if (pendientes.isEmpty) return const SizedBox.shrink();
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppColors.warning.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(8),
+                border:
+                    Border.all(color: AppColors.warning.withValues(alpha: 0.4)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.pending_actions, color: AppColors.warning),
+                  const SizedBox(width: 8),
+                  Text(
+                    '⏳ Pendientes de cobro (${pendientes.length})',
+                    style: const TextStyle(
+                        color: AppColors.warning, fontWeight: FontWeight.bold),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 8),
+            ...pendientes.map(_buildCardPendiente),
+            const SizedBox(height: 20),
+          ],
+        );
+      },
+      orElse: () => const SizedBox.shrink(),
+    );
+  }
+
+  Widget _buildCardPendiente(ConsultaPendiente consulta) {
+    final fecha = consulta.fechaConsulta;
+    final hora = fecha != null
+        ? '${fecha.hour.toString().padLeft(2, '0')}:${fecha.minute.toString().padLeft(2, '0')}'
+        : '';
+    return Card(
+      margin: const EdgeInsets.only(bottom: 8),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    consulta.nombrePaciente,
+                    style: const TextStyle(
+                        fontWeight: FontWeight.bold, fontSize: 15),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    '${consulta.nombreDoctora}${hora.isNotEmpty ? ' · $hora' : ''}',
+                    style: const TextStyle(
+                        color: AppColors.textSecondary, fontSize: 12),
+                  ),
+                  const SizedBox(height: 4),
+                  ...consulta.procedimientos.map((p) => Text(
+                        '• ${p['nombre'] ?? ''}',
+                        style: const TextStyle(
+                            fontSize: 12, color: AppColors.textSecondary),
+                      )),
+                  if (consulta.notasParaCaja.isNotEmpty)
+                    Container(
+                      margin: const EdgeInsets.only(top: 4),
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: AppColors.primary.withValues(alpha: 0.08),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        '📝 ${consulta.notasParaCaja}',
+                        style: const TextStyle(
+                            fontSize: 11, color: AppColors.primary),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 12),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text(
+                  'Q ${consulta.totalEstimado.toStringAsFixed(2)}',
+                  style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.primary),
+                ),
+                const SizedBox(height: 8),
+                ElevatedButton.icon(
+                  onPressed: () => _cobrarConsulta(consulta),
+                  icon: const Icon(Icons.point_of_sale,
+                      color: Colors.white, size: 16),
+                  label: const Text('Cobrar',
+                      style: TextStyle(color: Colors.white)),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _cobrarConsulta(ConsultaPendiente consulta) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => _NuevoCobroDialog(
+        consultaPrefill: consulta,
+        onCobroCreado: () {
+          _cargarResumen();
+        },
+      ),
     );
   }
 
@@ -778,8 +908,13 @@ class _ResumenCard extends StatelessWidget {
 
 class _NuevoCobroDialog extends ConsumerStatefulWidget {
   final VoidCallback onCobroCreado;
+  // Si viene de una consulta de la doctora, se pre-llena el cobro.
+  final ConsultaPendiente? consultaPrefill;
 
-  const _NuevoCobroDialog({required this.onCobroCreado});
+  const _NuevoCobroDialog({
+    required this.onCobroCreado,
+    this.consultaPrefill,
+  });
 
   @override
   ConsumerState<_NuevoCobroDialog> createState() => _NuevoCobroDialogState();
@@ -863,9 +998,69 @@ class _NuevoCobroDialogState extends ConsumerState<_NuevoCobroDialog> {
   @override
   void initState() {
     super.initState();
-    _items = [_crearItemVacio()];
-    _agregarControllers();
+    final prefill = widget.consultaPrefill;
+    if (prefill != null && prefill.procedimientos.isNotEmpty) {
+      // Pre-llenar los servicios con los procedimientos de la doctora.
+      // Si el procedimiento no se eligió del catálogo (sin servicioId), se le
+      // asigna un id sintético para que el cobro lo trate como servicio válido.
+      _items = prefill.procedimientos.asMap().entries.map((e) {
+        final p = e.value;
+        final sid = (p['servicioId'] ?? '').toString();
+        return ItemVenta(
+          servicioId: sid.isNotEmpty ? sid : 'proc_${e.key}',
+          servicio: (p['nombre'] ?? '').toString(),
+          clinicaId: prefill.clinicaId,
+          clinica: prefill.clinica,
+          descripcion: (p['descripcion'] ?? '').toString(),
+          monto: ((p['precio'] as num?) ?? 0).toDouble(),
+        );
+      }).toList();
+      for (final item in _items) {
+        final montoCtrl =
+            TextEditingController(text: item.monto.toStringAsFixed(2));
+        final descCtrl = TextEditingController(text: item.descripcion);
+        _montoControllers.add(montoCtrl);
+        _descControllers.add(descCtrl);
+      }
+      if (prefill.clinicaId.isNotEmpty) {
+        _clinicaId = prefill.clinicaId;
+        _clinicaNombre = prefill.clinica;
+      }
+    } else {
+      _items = [_crearItemVacio()];
+      _agregarControllers();
+    }
     _cargarCatalogos();
+    _cargarPacientePrefill();
+  }
+
+  /// Carga el paciente de la consulta de la doctora (si aplica) y lo selecciona.
+  Future<void> _cargarPacientePrefill() async {
+    final prefill = widget.consultaPrefill;
+    if (prefill == null || prefill.pacienteId.isEmpty) return;
+    try {
+      final paciente =
+          await PacienteService().getPacienteById(prefill.pacienteId);
+      if (paciente != null && mounted) {
+        setState(() {
+          _esPaciente = true;
+          _pacienteSeleccionado = paciente;
+          if ((_clinicaId == null || _clinicaId!.isEmpty) &&
+              paciente.clinicaId != null) {
+            _clinicaId = paciente.clinicaId;
+            _clinicaNombre = paciente.clinica;
+            for (final item in _items) {
+              if (item.clinicaId.isEmpty) {
+                item.clinicaId = paciente.clinicaId ?? '';
+                item.clinica = paciente.clinica ?? '';
+              }
+            }
+          }
+        });
+      }
+    } catch (_) {
+      // Si no se puede cargar, la secretaria puede seleccionar manualmente.
+    }
   }
 
   void _agregarControllers() {
@@ -912,7 +1107,22 @@ class _NuevoCobroDialogState extends ConsumerState<_NuevoCobroDialog> {
         setState(() {
           // Eliminar duplicados por id para evitar el assertion de Dropdown
           // ('exactly one item with value').
-          _servicios = _dedupPorId(servicios, (s) => s.id);
+          var serviciosDedup = _dedupPorId(servicios, (s) => s.id);
+          // Inyectar los procedimientos pre-llenados que no estén en el catálogo
+          // para que el dropdown del cobro pueda mostrarlos.
+          final prefill = widget.consultaPrefill;
+          if (prefill != null) {
+            final idsExistentes = serviciosDedup.map((s) => s.id).toSet();
+            for (final item in _items) {
+              if (item.servicioId.isNotEmpty &&
+                  !idsExistentes.contains(item.servicioId)) {
+                serviciosDedup.add(ServicioClinica(
+                    id: item.servicioId, nombre: item.servicio));
+                idsExistentes.add(item.servicioId);
+              }
+            }
+          }
+          _servicios = serviciosDedup;
           _clinicas = _dedupPorId(clinicas, (c) => c.id);
           _todosMedicamentos = medicamentos;
           _todosBoutique = boutique;
@@ -2367,6 +2577,24 @@ class _NuevoCobroDialogState extends ConsumerState<_NuevoCobroDialog> {
         );
       }
 
+      // 4b. Si el cobro proviene de una consulta de la doctora:
+      //     · Descontar del inventario los medicamentos que recetó.
+      //     · Marcar la consulta como cobrada.
+      final prefill = widget.consultaPrefill;
+      if (prefill != null) {
+        await _descontarMedsFarmaciaDeConsulta(
+          procedimientos: prefill.procedimientos,
+          ventaId: ventaId,
+          uid: usuario?.id ?? '',
+          nombreResponsable: usuario?.nombre ?? '',
+        );
+        await ConsultaCobroService().marcarCobrada(
+          consultaId: prefill.id,
+          pacienteId: prefill.pacienteId,
+          ventaId: ventaId,
+        );
+      }
+
       // 5. Enviar factura automáticamente si hay email:
       //    - cliente externo: siempre que haya email.
       //    - paciente registrado: solo si el switch está activado.
@@ -2421,6 +2649,33 @@ class _NuevoCobroDialogState extends ConsumerState<_NuevoCobroDialog> {
           ),
         );
       }
+    }
+  }
+
+  /// Descuenta del inventario de farmacia los medicamentos recetados por la
+  /// doctora. Reutiliza [FarmaciaService.descontarPorVenta] que ya gestiona la
+  /// transacción atómica y registra el movimiento.
+  Future<void> _descontarMedsFarmaciaDeConsulta({
+    required List<Map<String, dynamic>> procedimientos,
+    required String ventaId,
+    required String uid,
+    required String nombreResponsable,
+  }) async {
+    final farmacia = FarmaciaService();
+    for (final p in procedimientos) {
+      if ((p['tipo'] ?? '') != 'medicamento') continue;
+      final medId = (p['medicamentoId'] ?? '').toString();
+      if (medId.isEmpty) continue;
+      final cantidad = (p['cantidad'] as num?)?.toInt() ?? 1;
+      final nombre = (p['nombre'] ?? '').toString();
+      await farmacia.descontarPorVenta(
+        medicamentoId: medId,
+        nombreMedicamento: nombre,
+        cantidad: cantidad,
+        ventaId: ventaId,
+        uid: uid,
+        nombreResponsable: nombreResponsable,
+      );
     }
   }
 

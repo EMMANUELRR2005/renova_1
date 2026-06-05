@@ -66,6 +66,11 @@ class PacienteService {
         (doc) => doc.exists ? Paciente.fromMap(doc.data()!, doc.id) : null);
   }
 
+  Future<Paciente?> getPacienteById(String id) async {
+    final doc = await _db.collection('pacientes').doc(id).get();
+    return doc.exists ? Paciente.fromMap(doc.data()!, doc.id) : null;
+  }
+
   Future<bool> existeNumeroIdentificacion(String numero,
       {String? excludeId}) async {
     final snap = await _db

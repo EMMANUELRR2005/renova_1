@@ -509,7 +509,7 @@ class AppShell extends ConsumerWidget {
       ]);
     }
 
-    // Cerrar sesión (todos los roles)
+    // Cerrar sesión (todos los roles) — Salir vive únicamente en el login.
     items.add(
       SidebarItem(
         icon: Icons.logout_rounded,
@@ -518,16 +518,6 @@ class AppShell extends ConsumerWidget {
         onTap: () async {
           await ref.read(logoutProvider)();
         },
-      ),
-    );
-
-    // Salir de la app (mantiene la sesión activa)
-    items.add(
-      SidebarItem(
-        icon: Icons.exit_to_app_rounded,
-        label: 'Salir',
-        isActive: false,
-        onTap: () => _mostrarDialogoSalir(context),
       ),
     );
 

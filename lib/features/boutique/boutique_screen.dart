@@ -37,6 +37,8 @@ class BoutiqueScreen extends ConsumerStatefulWidget {
 class _BoutiqueScreenState extends ConsumerState<BoutiqueScreen> {
   final _busquedaCtrl = TextEditingController();
   String _busqueda = '';
+  String? _categoriaSeleccionada;
+  String? _tallaFiltro;
 
   @override
   void dispose() {
@@ -48,16 +50,46 @@ class _BoutiqueScreenState extends ConsumerState<BoutiqueScreen> {
       rol == RolUsuario.administradora ? 6 : 0;
 
   List<ProductoBoutique> _filtrar(List<ProductoBoutique> ps) {
-    if (_busqueda.isEmpty) return ps;
-    final q = _busqueda.toLowerCase();
-    return ps.where((p) {
-      return p.nombre.toLowerCase().contains(q) ||
-          p.codigoBarras.toLowerCase().contains(q) ||
-          p.codigoInterno.toLowerCase().contains(q) ||
-          p.talla.toLowerCase().contains(q) ||
-          p.categoria.toLowerCase().contains(q) ||
-          p.estante.toLowerCase().contains(q);
-    }).toList();
+    var lista = ps;
+
+    // Filtro por categoría
+    if (_categoriaSeleccionada != null) {
+      lista =
+          lista.where((p) => p.categoria == _categoriaSeleccionada).toList();
+    }
+
+    // Filtro por talla
+    if (_tallaFiltro != null) {
+      lista = lista
+          .where((p) => p.talla.toLowerCase() == _tallaFiltro!.toLowerCase())
+          .toList();
+    }
+
+    // Filtro por búsqueda de texto
+    if (_busqueda.isNotEmpty) {
+      final q = _busqueda.toLowerCase();
+      lista = lista.where((p) {
+        return p.nombre.toLowerCase().contains(q) ||
+            p.codigoBarras.toLowerCase().contains(q) ||
+            p.codigoInterno.toLowerCase().contains(q) ||
+            p.talla.toLowerCase().contains(q) ||
+            p.categoria.toLowerCase().contains(q) ||
+            p.estante.toLowerCase().contains(q);
+      }).toList();
+    }
+
+    return lista;
+  }
+
+  /// Agrupa todos los productos por nombre para mostrar, en cada tarjeta, las
+  /// demás tallas disponibles del mismo producto (con o sin stock).
+  Map<String, List<ProductoBoutique>> _agruparPorNombre(
+      List<ProductoBoutique> ps) {
+    final map = <String, List<ProductoBoutique>>{};
+    for (final p in ps) {
+      map.putIfAbsent(p.nombre.toLowerCase().trim(), () => []).add(p);
+    }
+    return map;
   }
 
   @override
@@ -101,16 +133,29 @@ class _BoutiqueScreenState extends ConsumerState<BoutiqueScreen> {
               ],
             ),
             const SizedBox(height: 16),
-            // Buscador
-            TextField(
-              controller: _busquedaCtrl,
-              decoration: const InputDecoration(
-                hintText: 'Buscar por nombre, código, talla o estante...',
-                prefixIcon: Icon(Icons.search, size: 20),
-                isDense: true,
-              ),
-              onChanged: (v) => setState(() => _busqueda = v),
+            // Buscador + filtro de talla
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _busquedaCtrl,
+                    decoration: const InputDecoration(
+                      hintText:
+                          'Buscar por nombre, código, talla o estante...',
+                      prefixIcon: Icon(Icons.search, size: 20),
+                      isDense: true,
+                    ),
+                    onChanged: (v) => setState(() => _busqueda = v),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                _buildFiltroTalla(),
+              ],
             ),
+            const SizedBox(height: 12),
+            // Chips de categorías
+            _buildChipsCategorias(),
             const SizedBox(height: 16),
             // Grid
             Expanded(
@@ -125,19 +170,24 @@ class _BoutiqueScreenState extends ConsumerState<BoutiqueScreen> {
                     return _vacio('No hay productos registrados');
                   }
                   if (filtrados.isEmpty) {
-                    return _vacio('Sin resultados para "$_busqueda"');
+                    return _vacio('Sin resultados con los filtros aplicados');
                   }
+                  // Todas las variantes (tallas) por nombre de producto.
+                  final variantes = _agruparPorNombre(productos);
                   return GridView.builder(
                     gridDelegate:
                         const SliverGridDelegateWithMaxCrossAxisExtent(
                       maxCrossAxisExtent: 240,
-                      mainAxisExtent: 330,
+                      mainAxisExtent: 384,
                       crossAxisSpacing: 16,
                       mainAxisSpacing: 16,
                     ),
                     itemCount: filtrados.length,
                     itemBuilder: (_, i) => _ProductoCard(
                       producto: filtrados[i],
+                      tallasProducto:
+                          variantes[filtrados[i].nombre.toLowerCase().trim()] ??
+                              [filtrados[i]],
                       puedeEditar: Permisos.puedeGestionarBoutique(rol),
                       puedeEliminar: Permisos.puedeEliminarBoutique(rol),
                       onEditar: () => _abrirFormulario(filtrados[i]),
@@ -166,6 +216,77 @@ class _BoutiqueScreenState extends ConsumerState<BoutiqueScreen> {
             child: Text(msg,
                 style: const TextStyle(color: AppColors.textSecondary))),
       );
+
+  Widget _buildChipsCategorias() {
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: FilterChip(
+              label: const Text('Todas'),
+              selected: _categoriaSeleccionada == null,
+              onSelected: (_) =>
+                  setState(() => _categoriaSeleccionada = null),
+              selectedColor: AppColors.primary,
+              checkmarkColor: Colors.white,
+              labelStyle: TextStyle(
+                color: _categoriaSeleccionada == null
+                    ? Colors.white
+                    : AppColors.textPrimary,
+              ),
+            ),
+          ),
+          for (final cat in _categorias)
+            Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: FilterChip(
+                label: Text(cat),
+                selected: _categoriaSeleccionada == cat,
+                onSelected: (_) => setState(() => _categoriaSeleccionada =
+                    _categoriaSeleccionada == cat ? null : cat),
+                selectedColor: AppColors.primary,
+                checkmarkColor: Colors.white,
+                labelStyle: TextStyle(
+                  color: _categoriaSeleccionada == cat
+                      ? Colors.white
+                      : AppColors.textPrimary,
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFiltroTalla() {
+    const tallas = ['S', 'M', 'L', 'XL', 'XXL', 'N/A'];
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      decoration: BoxDecoration(
+        color: AppColors.card,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: DropdownButton<String?>(
+        value: _tallaFiltro,
+        hint: const Text('Talla'),
+        underline: const SizedBox.shrink(),
+        items: [
+          const DropdownMenuItem<String?>(
+            value: null,
+            child: Text('Todas las tallas'),
+          ),
+          ...tallas.map((t) => DropdownMenuItem<String?>(
+                value: t,
+                child: Text(t),
+              )),
+        ],
+        onChanged: (val) => setState(() => _tallaFiltro = val),
+      ),
+    );
+  }
 
   void _abrirFormulario(ProductoBoutique? producto) {
     showDialog(
@@ -205,6 +326,7 @@ class _BoutiqueScreenState extends ConsumerState<BoutiqueScreen> {
 
 class _ProductoCard extends StatelessWidget {
   final ProductoBoutique producto;
+  final List<ProductoBoutique> tallasProducto;
   final bool puedeEditar;
   final bool puedeEliminar;
   final VoidCallback onEditar;
@@ -212,6 +334,7 @@ class _ProductoCard extends StatelessWidget {
 
   const _ProductoCard({
     required this.producto,
+    required this.tallasProducto,
     required this.puedeEditar,
     required this.puedeEliminar,
     required this.onEditar,
@@ -330,11 +453,62 @@ class _ProductoCard extends StatelessWidget {
                         fontWeight: FontWeight.bold,
                         color: AppColors.primary),
                   ),
+                  _buildTallasDisponibles(),
                 ],
               ),
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  /// Muestra las tallas disponibles del mismo producto. Las que no tienen stock
+  /// aparecen tachadas y en gris.
+  Widget _buildTallasDisponibles() {
+    // Solo tiene sentido si hay variantes con talla real.
+    final variantes = tallasProducto
+        .where((v) => v.talla.trim().isNotEmpty && v.talla != 'N/A')
+        .toList();
+    if (variantes.length < 2) return const SizedBox.shrink();
+
+    // Ordenar y deduplicar por talla (sumando stock de la misma talla).
+    final porTalla = <String, int>{};
+    for (final v in variantes) {
+      porTalla[v.talla] = (porTalla[v.talla] ?? 0) + v.cantidad;
+    }
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 6),
+      child: Wrap(
+        spacing: 4,
+        runSpacing: 4,
+        children: porTalla.entries.map((e) {
+          final hayStock = e.value > 0;
+          return Container(
+            padding:
+                const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: hayStock
+                  ? AppColors.primary.withValues(alpha: 0.1)
+                  : Colors.grey[200],
+              borderRadius: BorderRadius.circular(4),
+              border: Border.all(
+                color: hayStock ? AppColors.primary : Colors.grey,
+              ),
+            ),
+            child: Text(
+              e.key,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.bold,
+                color: hayStock ? AppColors.primary : Colors.grey,
+                decoration:
+                    hayStock ? null : TextDecoration.lineThrough,
+              ),
+            ),
+          );
+        }).toList(),
       ),
     );
   }

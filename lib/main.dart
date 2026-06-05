@@ -76,11 +76,39 @@ void main() async {
 }
 
 
-class MainApp extends ConsumerWidget {
+class MainApp extends ConsumerStatefulWidget {
   const MainApp({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<MainApp> createState() => _MainAppState();
+}
+
+class _MainAppState extends ConsumerState<MainApp>
+    with WidgetsBindingObserver {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  // Modo kiosco: cada vez que la app vuelve al primer plano (tras bajar el panel
+  // de notificaciones, mostrar la barra de gestos, etc.) reactivamos la pantalla
+  // completa inmersiva para que no quede visible la UI del sistema.
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (!kIsWeb && state == AppLifecycleState.resumed) {
+      SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     // Reafirmar pantalla completa (immersiveSticky se reactiva tras gestos).
     if (!kIsWeb) {
       SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
