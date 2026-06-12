@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -14,7 +13,7 @@ import '../../data/mock/providers.dart' hide authServiceProvider;
 import '../../features/auth/providers/auth_provider.dart';
 
 class UsuariosScreen extends ConsumerWidget {
-  const UsuariosScreen({Key? key}) : super(key: key);
+  const UsuariosScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -424,12 +423,12 @@ class _NuevoUsuarioDialogState extends State<_NuevoUsuarioDialog> {
       _errorMsg = null;
     });
 
-    print('🔵 Iniciando creación de usuario: ${_emailCtrl.text.trim()}');
+    debugPrint('🔵 Iniciando creación de usuario: ${_emailCtrl.text.trim()}');
 
     try {
       final authService = widget.ref.read(authServiceProvider);
 
-      print('🔵 Llamando crearUsuario en AuthService...');
+      debugPrint('🔵 Llamando crearUsuario en AuthService...');
 
       // Timeout de 40s para que el spinner nunca quede infinito
       final usuario = await authService
@@ -442,7 +441,7 @@ class _NuevoUsuarioDialogState extends State<_NuevoUsuarioDialog> {
           .timeout(const Duration(seconds: 40));
 
       if (usuario != null) {
-        print('✅ Usuario creado — UID: ${usuario.id} / rol: ${usuario.rol.name}');
+        debugPrint('✅ Usuario creado — UID: ${usuario.id} / rol: ${usuario.rol.name}');
         if (mounted) {
           // ① Snackbar PRIMERO — contexto aún vivo dentro del dialog
           ScaffoldMessenger.of(context).showSnackBar(
@@ -460,24 +459,24 @@ class _NuevoUsuarioDialogState extends State<_NuevoUsuarioDialog> {
       }
 
     } on FirebaseAuthException catch (e) {
-      print('❌ FirebaseAuth: ${e.code} — ${e.message}');
+      debugPrint('❌ FirebaseAuth: ${e.code} — ${e.message}');
       if (mounted) setState(() => _errorMsg = _mapAuthError(e.code));
 
     } on FirebaseException catch (e) {
-      print('❌ Firestore: ${e.code} — ${e.message}');
+      debugPrint('❌ Firestore: ${e.code} — ${e.message}');
       if (mounted) {
         setState(() => _errorMsg = 'Error de base de datos: ${e.message ?? e.code}');
       }
 
     } on TimeoutException {
-      print('❌ Timeout: la operación tardó más de 40 segundos');
+      debugPrint('❌ Timeout: la operación tardó más de 40 segundos');
       if (mounted) {
         setState(() => _errorMsg =
             'Tiempo de espera agotado. Verifica tu conexión a internet.');
       }
 
     } catch (e) {
-      print('❌ Error desconocido: $e');
+      debugPrint('❌ Error desconocido: $e');
       if (mounted) setState(() => _errorMsg = 'Error inesperado: $e');
 
     } finally {
@@ -569,7 +568,7 @@ class _NuevoUsuarioDialogState extends State<_NuevoUsuarioDialog> {
               const SizedBox(height: 12),
               // Rol
               DropdownButtonFormField<RolUsuario>(
-                value: _rolSeleccionado,
+                initialValue: _rolSeleccionado,
                 decoration:
                     const InputDecoration(labelText: 'Rol *'),
                 items: _rolesCreables

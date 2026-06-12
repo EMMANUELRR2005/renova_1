@@ -8,7 +8,7 @@ import '../../core/widgets/widgets_comunes.dart';
 import '../../data/mock/providers.dart';
 
 class AgendaTerapeutaScreen extends ConsumerWidget {
-  const AgendaTerapeutaScreen({Key? key}) : super(key: key);
+  const AgendaTerapeutaScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {

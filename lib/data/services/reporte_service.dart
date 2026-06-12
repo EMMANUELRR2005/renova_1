@@ -76,7 +76,7 @@ class ReporteService {
       final data = doc.data();
       if (data['estado'] != 'anulado') {
         final fecha = (data['fechaVenta'] as Timestamp?)?.toDate();
-        if (fecha != null && fecha.isAfter(desde!) && fecha.isBefore(hasta!)) {
+        if (fecha != null && fecha.isAfter(desde) && fecha.isBefore(hasta)) {
           final monto = (data['monto'] ?? 0).toDouble();
           switch (data['metodoPago']) {
             case 'efectivo':
@@ -119,7 +119,7 @@ class ReporteService {
       final data = doc.data();
       if (data['estado'] != 'anulado') {
         final fecha = (data['fechaVenta'] as Timestamp?)?.toDate();
-        if (fecha != null && fecha.isAfter(desde!) && fecha.isBefore(hasta!)) {
+        if (fecha != null && fecha.isAfter(desde) && fecha.isBefore(hasta)) {
           final servicio = data['servicio'] as String? ?? 'Sin servicio';
           serviciosCount[servicio] = (serviciosCount[servicio] ?? 0) + 1;
         }
@@ -747,7 +747,7 @@ class ReporteService {
     for (final doc in citasSnap.docs) {
       final data = doc.data();
       final fecha = (data['fecha'] as Timestamp?)?.toDate();
-      if (fecha != null && fecha.isAfter(desde!) && fecha.isBefore(hasta!)) {
+      if (fecha != null && fecha.isAfter(desde) && fecha.isBefore(hasta)) {
         total++;
         switch (data['estado']) {
           case 'confirmada':

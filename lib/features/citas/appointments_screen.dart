@@ -9,6 +9,7 @@ import '../../core/widgets/app_shell.dart';
 import '../../core/widgets/widgets_comunes.dart';
 import '../../data/mock/mock_data.dart';
 import '../../data/mock/providers.dart';
+import '../../data/services/notificacion_service.dart';
 import '../../features/auth/providers/auth_provider.dart';
 
 class AppointmentsScreen extends ConsumerWidget {
@@ -564,7 +565,23 @@ class _FormularioNuevaCitaState extends ConsumerState<_FormularioNuevaCita> {
         creadaPor: usuario?.id ?? '',
       );
 
-      await citaService.crearCitaMedica(cita);
+      final citaId = await citaService.crearCitaMedica(cita);
+
+      // Notificar a la doctora asignada.
+      if (_doctoraId != null && _doctoraId!.isNotEmpty) {
+        final diaStr =
+            '${_fecha.day.toString().padLeft(2, '0')}/${_fecha.month.toString().padLeft(2, '0')}/${_fecha.year}';
+        final horaStr =
+            '${_hora.hour.toString().padLeft(2, '0')}:${_hora.minute.toString().padLeft(2, '0')}';
+        await NotificacionService().crearNotificacionCita(
+          doctoraId: _doctoraId!,
+          nombrePaciente: _pacienteSeleccionado!.nombreCompleto,
+          fecha: diaStr,
+          hora: horaStr,
+          citaId: citaId,
+          pacienteId: _pacienteSeleccionado!.id,
+        );
+      }
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -770,7 +787,7 @@ class _FormularioNuevaCitaState extends ConsumerState<_FormularioNuevaCita> {
                                   color: AppColors.textSecondary)),
                           const SizedBox(height: 6),
                           DropdownButtonFormField<String>(
-                            value: servicios.any((s) => s.id == _servicioId)
+                            initialValue: servicios.any((s) => s.id == _servicioId)
                                 ? _servicioId
                                 : null,
                             decoration: const InputDecoration(
@@ -812,7 +829,7 @@ class _FormularioNuevaCitaState extends ConsumerState<_FormularioNuevaCita> {
                                   color: AppColors.textSecondary)),
                           const SizedBox(height: 6),
                           DropdownButtonFormField<String>(
-                            value: clinicas.any((c) => c.id == _clinicaId)
+                            initialValue: clinicas.any((c) => c.id == _clinicaId)
                                 ? _clinicaId
                                 : null,
                             decoration: const InputDecoration(
@@ -857,7 +874,7 @@ class _FormularioNuevaCitaState extends ConsumerState<_FormularioNuevaCita> {
                             color: AppColors.textSecondary)),
                     const SizedBox(height: 6),
                     DropdownButtonFormField<String>(
-                      value: doctoras.any((d) => d.id == _doctoraId)
+                      initialValue: doctoras.any((d) => d.id == _doctoraId)
                           ? _doctoraId
                           : null,
                       decoration: const InputDecoration(

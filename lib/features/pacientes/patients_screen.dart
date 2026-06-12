@@ -31,10 +31,15 @@ class _PatientsScreenState extends ConsumerState<PatientsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final pacientesAsync = ref.watch(pacientesV2StreamProvider);
     final usuario = ref.watch(usuarioActivoProvider);
     final rol = usuario?.rol;
     final filtroEstado = ref.watch(filtroPacientesEstadoProvider);
+
+    // Doctora: solo ve sus pacientes con cita asignada.
+    // Los demás roles: ven todos (con filtro de estado del provider).
+    final AsyncValue<List<Paciente>> pacientesAsync = (rol == RolUsuario.doctora)
+        ? ref.watch(pacientesDoctoraProvider)
+        : ref.watch(pacientesV2StreamProvider);
 
     return AppShell(
       selectedIndex: _getSidebarIndex(rol),
@@ -115,7 +120,11 @@ class _PatientsScreenState extends ConsumerState<PatientsScreen> {
               error: (e, _) => Text('Error: $e',
                   style: const TextStyle(color: AppColors.danger)),
               data: (pacientes) {
-                final filtrados = pacientes.where((p) {
+                // Para doctora el proveedor no filtra por estado; aplicar aquí.
+                final base = (rol == RolUsuario.doctora && filtroEstado != 'todos')
+                    ? pacientes.where((p) => p.estado == filtroEstado).toList()
+                    : pacientes;
+                final filtrados = base.where((p) {
                   if (_searchQuery.isEmpty) return true;
                   return p.nombreCompleto.toLowerCase().contains(_searchQuery) ||
                       p.telefono.contains(_searchQuery);

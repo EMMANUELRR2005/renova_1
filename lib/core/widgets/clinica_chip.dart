@@ -8,11 +8,11 @@ class ClinicaChip extends StatelessWidget {
   final VoidCallback onTap;
 
   const ClinicaChip({
-    Key? key,
+    super.key,
     required this.label,
     required this.isSelected,
     required this.onTap,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {

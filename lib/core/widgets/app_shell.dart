@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -6,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import '../../features/auth/providers/auth_provider.dart';
 import '../utils/app_exit.dart';
 import '../../data/mock/providers.dart';
+import '../../data/services/notificacion_service.dart';
 import '../theme/app_theme.dart';
 import 'sidebar_item.dart';
 import '../../data/mock/mock_data.dart';
@@ -17,12 +19,12 @@ class AppShell extends ConsumerWidget {
   final Widget? floatingActionButton;
 
   const AppShell({
-    Key? key,
+    super.key,
     required this.child,
     required this.selectedIndex,
     required this.onNavigate,
     this.floatingActionButton,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -145,7 +147,9 @@ class AppShell extends ConsumerWidget {
                     ],
                   ),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 8),
+                _NotificacionBell(usuarioId: usuarioActivo?.id ?? ''),
+                const SizedBox(height: 4),
                 Divider(color: Colors.white.withValues(alpha: 0.1)),
                 Expanded(
                   child: ListView(
@@ -550,3 +554,219 @@ class AppShell extends ConsumerWidget {
 final selectedSidebarIndexProvider = StateProvider<int>((ref) {
   return 0;
 });
+
+// ── Campana de notificaciones (sidebar) ────────────────────────────────────
+
+class _NotificacionBell extends ConsumerWidget {
+  final String usuarioId;
+  const _NotificacionBell({required this.usuarioId});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    if (usuarioId.isEmpty) return const SizedBox.shrink();
+    final totalAsync = ref.watch(notificacionesNoLeidasProvider);
+    final total = totalAsync.asData?.value ?? 0;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(10),
+        onTap: () => _abrirPanel(context, ref),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.06),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Row(
+            children: [
+              Stack(
+                children: [
+                  const Icon(Icons.notifications_outlined,
+                      color: Colors.white, size: 20),
+                  if (total > 0)
+                    Positioned(
+                      right: 0,
+                      top: 0,
+                      child: Container(
+                        width: 14,
+                        height: 14,
+                        decoration: const BoxDecoration(
+                            color: Colors.redAccent, shape: BoxShape.circle),
+                        child: Center(
+                          child: Text(
+                            total > 9 ? '9+' : '$total',
+                            style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 8,
+                                fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'Notificaciones',
+                  style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.85),
+                      fontSize: 12),
+                ),
+              ),
+              if (total > 0)
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: Colors.redAccent,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Text('$total',
+                      style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold)),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _abrirPanel(BuildContext context, WidgetRef ref) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) => _PanelNotificaciones(usuarioId: usuarioId),
+    );
+  }
+}
+
+class _PanelNotificaciones extends StatelessWidget {
+  final String usuarioId;
+  const _PanelNotificaciones({required this.usuarioId});
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: MediaQuery.of(context).size.height * 0.65,
+      child: Column(
+        children: [
+          Container(
+            margin: const EdgeInsets.only(top: 10, bottom: 4),
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+                color: Colors.grey[300],
+                borderRadius: BorderRadius.circular(2)),
+          ),
+          Padding(
+            padding:
+                const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: Row(
+              children: [
+                const Text('Notificaciones',
+                    style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.primary)),
+                const Spacer(),
+                TextButton(
+                  onPressed: () =>
+                      NotificacionService().marcarTodasLeidas(usuarioId),
+                  child: const Text('Marcar todas como leídas'),
+                ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+              stream: NotificacionService().streamNotificaciones(usuarioId),
+              builder: (context, snapshot) {
+                if (!snapshot.hasData) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+                final docs = snapshot.data!.docs;
+                // Ordenar por fecha descendente en cliente.
+                docs.sort((a, b) {
+                  final fa = a.data()['fecha'];
+                  final fb = b.data()['fecha'];
+                  if (fa == null) return 1;
+                  if (fb == null) return -1;
+                  return (fb as Timestamp)
+                      .compareTo(fa as Timestamp);
+                });
+                if (docs.isEmpty) {
+                  return const Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.notifications_none,
+                            size: 48, color: Colors.grey),
+                        SizedBox(height: 8),
+                        Text('Sin notificaciones',
+                            style: TextStyle(color: Colors.grey)),
+                      ],
+                    ),
+                  );
+                }
+                return ListView.builder(
+                  itemCount: docs.length,
+                  itemBuilder: (_, i) {
+                    final data = docs[i].data();
+                    final leida = (data['leida'] as bool?) ?? false;
+                    return ListTile(
+                      tileColor: leida
+                          ? null
+                          : AppColors.primary.withValues(alpha: 0.05),
+                      leading: Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          color: leida
+                              ? Colors.grey[100]
+                              : AppColors.primary.withValues(alpha: 0.1),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(Icons.calendar_month,
+                            color:
+                                leida ? Colors.grey : AppColors.primary,
+                            size: 20),
+                      ),
+                      title: Text(
+                        data['titulo'] ?? '',
+                        style: TextStyle(
+                            fontWeight: leida
+                                ? FontWeight.normal
+                                : FontWeight.bold,
+                            fontSize: 13),
+                      ),
+                      subtitle: Text(
+                        data['mensaje'] ?? '',
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontSize: 12),
+                      ),
+                      onTap: () {
+                        if (!leida) {
+                          NotificacionService()
+                              .marcarLeida(docs[i].id);
+                        }
+                      },
+                    );
+                  },
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}

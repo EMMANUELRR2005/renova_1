@@ -14,10 +14,10 @@ class StatusBadge extends StatelessWidget {
   final double fontSize;
 
   const StatusBadge({
-    Key? key,
+    super.key,
     required this.status,
     this.fontSize = 12,
-  }) : super(key: key);
+  });
 
   Map<StatusType, Map<String, Color>> get _statusStyles => {
     StatusType.hospitalized: {

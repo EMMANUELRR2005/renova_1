@@ -10,14 +10,14 @@ class KpiCard extends StatelessWidget {
   final Color iconBgColor;
 
   const KpiCard({
-    Key? key,
+    super.key,
     required this.icon,
     required this.number,
     required this.label,
     required this.trend,
     this.trendColor = AppColors.success,
     this.iconBgColor = AppColors.primaryLight,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {

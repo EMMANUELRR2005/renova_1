@@ -10,13 +10,13 @@ class SidebarItem extends StatelessWidget {
   final int badgeCount;
 
   const SidebarItem({
-    Key? key,
+    super.key,
     required this.icon,
     required this.label,
     required this.isActive,
     required this.onTap,
     this.badgeCount = 0,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {

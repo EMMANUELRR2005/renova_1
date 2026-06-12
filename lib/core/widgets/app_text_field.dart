@@ -15,7 +15,7 @@ class AppTextField extends StatefulWidget {
   final String? errorText;
 
   const AppTextField({
-    Key? key,
+    super.key,
     required this.label,
     this.hintText,
     this.controller,
@@ -26,7 +26,7 @@ class AppTextField extends StatefulWidget {
     this.onChanged,
     this.hasError = false,
     this.errorText,
-  }) : super(key: key);
+  });
 
   @override
   State<AppTextField> createState() => _AppTextFieldState();

@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -144,6 +145,18 @@ class DetallePacienteScreen extends ConsumerWidget {
                     ),
                     _EstadoBadge(estado: paciente.estado),
                     const SizedBox(width: 12),
+                    // Doctora: marcar cita como completada (inactiva el paciente).
+                    if (rol == RolUsuario.doctora && paciente.estado == 'activo')
+                      ElevatedButton.icon(
+                        onPressed: () => _confirmarCitaCompletada(
+                            context, ref, paciente, usuario!),
+                        icon: const Icon(Icons.check_circle_outline,
+                            color: Colors.white, size: 16),
+                        label: const Text('Cita Completada',
+                            style: TextStyle(color: Colors.white)),
+                        style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.clinicalGreen),
+                      ),
                     if (Permisos.puedeCambiarEstadoPaciente(rol))
                       OutlinedButton(
                         onPressed: () => _mostrarDialogCambioEstado(
@@ -657,6 +670,8 @@ class _HistorialCardState extends State<_HistorialCard> {
       case 'consulta':
       case 'consulta_medica':
         return AppColors.primary;
+      case 'cita_completada':
+        return AppColors.clinicalGreen;
       case 'nota_medica':
         return AppColors.clinicalGreen;
       case 'procedimiento':
@@ -675,9 +690,10 @@ class _HistorialCardState extends State<_HistorialCard> {
   String _tipoLabel(String tipo) {
     switch (tipo) {
       case 'consulta':
-        return 'Consulta';
       case 'consulta_medica':
-        return 'Consulta Médica';
+        return 'Servicio Realizado';
+      case 'cita_completada':
+        return 'Cita Completada';
       case 'nota_medica':
         return 'Nota Médica';
       case 'procedimiento':
@@ -980,6 +996,122 @@ void _verFotoEnGrande(BuildContext context, String fotoUrl, String nombrePacient
   );
 }
 
+// ── Confirmar cita completada (Doctora) ─────────────────────────────────────
+
+Future<void> _confirmarCitaCompletada(
+  BuildContext context,
+  WidgetRef ref,
+  Paciente paciente,
+  Usuario usuario,
+) async {
+  final confirmar = await showDialog<bool>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      title: const Row(
+        children: [
+          Icon(Icons.check_circle, color: AppColors.clinicalGreen),
+          SizedBox(width: 8),
+          Expanded(child: Text('Completar cita')),
+        ],
+      ),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '¿Marcar la cita de ${paciente.nombreCompleto} como completada?',
+            style: const TextStyle(fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'El paciente quedará como inactivo al completar la cita.',
+            style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
+          ),
+        ],
+      ),
+      actions: [
+        OutlinedButton(
+          onPressed: () => Navigator.pop(ctx, false),
+          child: const Text('Cancelar'),
+        ),
+        ElevatedButton.icon(
+          onPressed: () => Navigator.pop(ctx, true),
+          icon: const Icon(Icons.check_circle, color: Colors.white, size: 16),
+          label: const Text('Completar',
+              style: TextStyle(color: Colors.white)),
+          style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.clinicalGreen),
+        ),
+      ],
+    ),
+  );
+
+  if (confirmar != true) return;
+
+  try {
+    final db = FirebaseFirestore.instance;
+    final ahora = FieldValue.serverTimestamp();
+
+    // 1. Marcar paciente como inactivo.
+    await db.collection('pacientes').doc(paciente.id).update({
+      'estado': 'inactivo',
+      'fechaInactivacion': ahora,
+      'inactivadoPor': usuario.id,
+      'nombreInactivador': usuario.nombre,
+      'ultimaActualizacion': ahora,
+    });
+
+    // 2. Marcar las citas pendientes/confirmadas del paciente como completadas.
+    final citas = await db
+        .collection('citas_medicas')
+        .where('pacienteId', isEqualTo: paciente.id)
+        .where('estado', whereIn: ['pendiente', 'confirmada'])
+        .get();
+    for (final cita in citas.docs) {
+      await cita.reference.update({
+        'estado': 'completada',
+        'fechaCompletada': ahora,
+        'completadaPor': usuario.id,
+      });
+    }
+
+    // 3. Registrar en historial del paciente.
+    await db
+        .collection('pacientes')
+        .doc(paciente.id)
+        .collection('historial')
+        .add({
+      'tipo': 'cita_completada',
+      'fecha': ahora,
+      'creadoPor': usuario.id,
+      'rol_creador': usuario.rol.name,
+      'doctora': usuario.nombre,
+      'doctora_uid': usuario.id,
+      'nota': 'Cita completada',
+    });
+
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+              'Cita completada. Paciente marcado como inactivo.'),
+          backgroundColor: AppColors.success,
+        ),
+      );
+    }
+  } catch (e) {
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error: $e'),
+          backgroundColor: AppColors.danger,
+        ),
+      );
+    }
+  }
+}
+
 // ── Dialog para cambio de estado (Enfermera) ────────────────────────────────
 
 void _mostrarDialogCambioEstado(
@@ -1137,7 +1269,7 @@ class _InactivarPacienteDialogState extends State<_InactivarPacienteDialog> {
               )
             else
               DropdownButtonFormField<String>(
-                value: _servicioId,
+                initialValue: _servicioId,
                 decoration: const InputDecoration(
                   hintText: 'Selecciona el servicio realizado',
                   border: OutlineInputBorder(),

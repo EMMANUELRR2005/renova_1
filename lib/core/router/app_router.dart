@@ -34,8 +34,8 @@ class GoRouterNotifier extends ChangeNotifier {
 
 final _routerListenerProvider = ChangeNotifierProvider((ref) {
   final listener = GoRouterNotifier();
-  ref.listen(authStateProvider, (_, __) {
-    listener.notifyListeners();
+  ref.listen(authStateProvider, (_, _) {
+    listener.notifyListenersCustom();
   });
   return listener;
 });

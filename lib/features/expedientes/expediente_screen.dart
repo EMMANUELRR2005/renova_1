@@ -617,7 +617,7 @@ class _NuevaEntradaDialogState extends State<_NuevaEntradaDialog> {
           mainAxisSize: MainAxisSize.min,
           children: [
             DropdownButtonFormField<String>(
-              value: _tipo,
+              initialValue: _tipo,
               decoration: const InputDecoration(
                 labelText: 'Tipo *',
                 border: OutlineInputBorder(),

@@ -11,6 +11,7 @@ import '../services/usuario_service.dart';
 import '../services/catalogo_service.dart';
 import '../services/venta_service.dart';
 import '../services/consulta_cobro_service.dart';
+import '../services/notificacion_service.dart';
 import '../services/expediente_service.dart';
 import '../services/reporte_service.dart';
 import '../services/farmacia_service.dart';
@@ -99,7 +100,7 @@ final kpiProvider = Provider<Map<String, dynamic>>((ref) {
 
   final ingresosDelDia = citasHoy
       .where((c) => c.estado == EstadoCita.completada)
-      .fold(0.0, (sum, c) => sum + c.precioBase);
+      .fold(0.0, (total, c) => total + c.precioBase);
 
   final alertasClinicas = pacientes
       .where((p) => p.alergias.isNotEmpty || p.condicionesBase.isNotEmpty)
@@ -298,6 +299,62 @@ final consultasPendientesCobroProvider =
   final usuario = ref.watch(usuarioActivoProvider);
   if (usuario == null) return const Stream.empty();
   return ref.watch(consultaCobroServiceProvider).streamPendientes();
+});
+
+// ============================================================================
+// NOTIFICACIONES
+// ============================================================================
+
+final notificacionServiceProvider =
+    Provider((ref) => NotificacionService());
+
+/// Stream del número de notificaciones no leídas del usuario activo.
+final notificacionesNoLeidasProvider = StreamProvider<int>((ref) {
+  final usuario = ref.watch(usuarioActivoProvider);
+  if (usuario == null) return Stream.value(0);
+  return ref
+      .watch(notificacionServiceProvider)
+      .streamCantidadNoLeidas(usuario.id);
+});
+
+// ============================================================================
+// PACIENTES ASIGNADOS A LA DOCTORA
+// ============================================================================
+
+/// Lista de pacientes con citas activas asignadas a la doctora. Se carga como
+/// Future (no stream) para evitar índices compuestos en Firestore.
+final pacientesDoctoraProvider =
+    FutureProvider.autoDispose<List<Paciente>>((ref) async {
+  final usuario = ref.watch(usuarioActivoProvider);
+  if (usuario == null || usuario.rol != RolUsuario.doctora) return [];
+
+  final citasSnap = await FirebaseFirestore.instance
+      .collection('citas_medicas')
+      .where('doctoraId', isEqualTo: usuario.id)
+      .where('estado', whereIn: ['pendiente', 'confirmada'])
+      .get();
+
+  final ids = citasSnap.docs
+      .map((d) => (d.data()['pacienteId'] ?? '') as String)
+      .where((id) => id.isNotEmpty)
+      .toSet()
+      .toList();
+
+  if (ids.isEmpty) return [];
+
+  // Firestore whereIn acepta máximo 10 IDs por consulta.
+  final pacientes = <Paciente>[];
+  for (int i = 0; i < ids.length; i += 10) {
+    final chunk = ids.sublist(i, (i + 10).clamp(0, ids.length));
+    final snap = await FirebaseFirestore.instance
+        .collection('pacientes')
+        .where(FieldPath.documentId, whereIn: chunk)
+        .get();
+    pacientes.addAll(
+        snap.docs.map((d) => Paciente.fromMap(d.data(), d.id)));
+  }
+  pacientes.sort((a, b) => a.apellido.compareTo(b.apellido));
+  return pacientes;
 });
 
 final filtroVentasProvider = StateProvider<String>((ref) => 'hoy');

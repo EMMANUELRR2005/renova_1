@@ -1,4 +1,3 @@
-import 'dart:typed_data';
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:firebase_storage/firebase_storage.dart';
@@ -334,7 +333,7 @@ class _MedicamentoCard extends StatelessWidget {
                 ? CachedNetworkImage(
                     imageUrl: med.fotoUrl,
                     fit: BoxFit.cover,
-                    errorWidget: (_, __, ___) => const Icon(
+                    errorWidget: (_, _, _) => const Icon(
                         Icons.medication,
                         color: Colors.grey, size: 24),
                   )
@@ -755,7 +754,7 @@ class _FormularioMedicamentoDialogState
                         title: const Text('Requiere receta',
                             style: TextStyle(fontSize: 14)),
                         value: _requiereReceta,
-                        activeColor: AppColors.primary,
+                        activeThumbColor: AppColors.primary,
                         onChanged: (v) =>
                             setState(() => _requiereReceta = v),
                       ),
@@ -865,7 +864,7 @@ class _FormularioMedicamentoDialogState
                           child: CachedNetworkImage(
                             imageUrl: _fotoMedUrl!,
                             fit: BoxFit.cover,
-                            errorWidget: (_, __, ___) => const Icon(
+                            errorWidget: (_, _, _) => const Icon(
                                 Icons.medication,
                                 size: 48,
                                 color: Colors.grey),
@@ -980,7 +979,7 @@ class _FormularioMedicamentoDialogState
   Widget _dropdown(String label, String value, List<String> items,
       ValueChanged<String?> onChanged) {
     return DropdownButtonFormField<String>(
-      value: value,
+      initialValue: value,
       decoration: InputDecoration(
         labelText: label,
         border: const OutlineInputBorder(),
@@ -1022,7 +1021,7 @@ class _FormularioMedicamentoDialogState
             children: [
               const Icon(Icons.inventory_2_outlined, color: AppColors.primary),
               const SizedBox(width: 8),
-              Text('Stock actual: $_cantidadActual ${_unidad}',
+              Text('Stock actual: $_cantidadActual $_unidad',
                   style: const TextStyle(
                       fontWeight: FontWeight.bold, fontSize: 14)),
             ],
@@ -1066,7 +1065,7 @@ class _FormularioMedicamentoDialogState
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    'Nuevo stock: $_cantidadActual + $agregar = $nuevoTotal ${_unidad}',
+                    'Nuevo stock: $_cantidadActual + $agregar = $nuevoTotal $_unidad',
                     style: const TextStyle(
                         color: AppColors.success, fontWeight: FontWeight.bold),
                   ),

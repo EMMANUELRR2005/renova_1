@@ -552,25 +552,23 @@ class _CajaScreenState extends ConsumerState<CajaScreen> {
                   venta.id,
                   motivoController.text.trim(),
                 );
-                if (ctx.mounted) {
-                  Navigator.of(ctx).pop();
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Venta anulada'),
-                      backgroundColor: AppColors.success,
-                    ),
-                  );
-                  _cargarResumen();
-                }
+                if (ctx.mounted) Navigator.of(ctx).pop();
+                if (!mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Venta anulada'),
+                    backgroundColor: AppColors.success,
+                  ),
+                );
+                _cargarResumen();
               } catch (e) {
-                if (ctx.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Error: $e'),
-                      backgroundColor: AppColors.danger,
-                    ),
-                  );
-                }
+                if (!mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Error: $e'),
+                    backgroundColor: AppColors.danger,
+                  ),
+                );
               }
             },
             style: ElevatedButton.styleFrom(backgroundColor: AppColors.danger),
@@ -606,7 +604,7 @@ class _CajaScreenState extends ConsumerState<CajaScreen> {
 
     try {
       final existente = await service.getCierreDelDia();
-      if (!mounted) return;
+      if (!context.mounted) return;
       Navigator.of(context).pop(); // cerrar loader
 
       if (existente != null) {
@@ -621,7 +619,7 @@ class _CajaScreenState extends ConsumerState<CajaScreen> {
       if (!mounted) return;
       _mostrarConfirmacionCierre(cierre, service);
     } catch (e) {
-      if (mounted) {
+      if (context.mounted) {
         Navigator.of(context).pop();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Error: $e'), backgroundColor: AppColors.danger),
@@ -984,11 +982,11 @@ class _NuevoCobroDialogState extends ConsumerState<_NuevoCobroDialog> {
   final List<TextEditingController> _descControllers = [];
 
   double get _subtotalServicios =>
-      _items.fold(0.0, (sum, item) => sum + item.monto);
+      _items.fold(0.0, (total, item) => total + item.monto);
   double get _subtotalMedicamentos =>
-      _itemsMed.fold(0.0, (sum, m) => sum + m.subtotal);
+      _itemsMed.fold(0.0, (total, m) => total + m.subtotal);
   double get _subtotalBoutique =>
-      _itemsBoutique.fold(0.0, (sum, b) => sum + b.subtotal);
+      _itemsBoutique.fold(0.0, (total, b) => total + b.subtotal);
   double get _subtotal =>
       _subtotalServicios + _subtotalMedicamentos + _subtotalBoutique;
   double get _subtotalSinIva => _subtotal / 1.12;
@@ -1323,13 +1321,6 @@ class _NuevoCobroDialogState extends ConsumerState<_NuevoCobroDialog> {
     }
   }
 
-  void _actualizarMontoDesdeController(int index) {
-    if (index < _items.length && index < _montoControllers.length) {
-      final valor = double.tryParse(_montoControllers[index].text) ?? 0;
-      _items[index].monto = valor;
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     return Dialog(
@@ -1543,7 +1534,7 @@ class _NuevoCobroDialogState extends ConsumerState<_NuevoCobroDialog> {
                 secondary: const Icon(Icons.email_outlined,
                     color: AppColors.primary),
                 value: _enviarEmailPaciente,
-                activeColor: AppColors.primary,
+                activeThumbColor: AppColors.primary,
                 onChanged: (v) => setState(() => _enviarEmailPaciente = v),
               ),
             ),
@@ -1647,7 +1638,7 @@ class _NuevoCobroDialogState extends ConsumerState<_NuevoCobroDialog> {
 
         DropdownButtonFormField<String>(
           // Solo usar el value si existe en la lista (evita el assertion).
-          value: _clinicas.any((c) => c.id == _clinicaId) ? _clinicaId : null,
+          initialValue: _clinicas.any((c) => c.id == _clinicaId) ? _clinicaId : null,
           decoration: const InputDecoration(
             labelText: 'Clínica *',
             border: OutlineInputBorder(),
@@ -1738,7 +1729,7 @@ class _NuevoCobroDialogState extends ConsumerState<_NuevoCobroDialog> {
                   flex: 3,
                   child: DropdownButtonFormField<String>(
                     // Solo usar el value si existe en la lista de servicios.
-                    value: _servicios.any((s) => s.id == item.servicioId)
+                    initialValue: _servicios.any((s) => s.id == item.servicioId)
                         ? item.servicioId
                         : null,
                     decoration: const InputDecoration(
@@ -2185,7 +2176,7 @@ class _NuevoCobroDialogState extends ConsumerState<_NuevoCobroDialog> {
         ],
         if (_metodoPago == 'visa_cuotas') ...[
           DropdownButtonFormField<int>(
-            value: _cuotas,
+            initialValue: _cuotas,
             decoration: const InputDecoration(
               labelText: 'Número de cuotas',
               border: OutlineInputBorder(),
@@ -2789,7 +2780,7 @@ class _ItemMed {
   final String codigoBarras;
   final double precioUnitario;
   final int stockDisponible;
-  int cantidad;
+  int cantidad = 1;
 
   _ItemMed({
     required this.medicamentoId,
@@ -2797,7 +2788,6 @@ class _ItemMed {
     required this.codigoBarras,
     required this.precioUnitario,
     required this.stockDisponible,
-    this.cantidad = 1,
   });
 
   double get subtotal => precioUnitario * cantidad;
@@ -2810,7 +2800,7 @@ class _ItemBoutique {
   final double precioUnitario;
   final int stockDisponible;
   final String talla;
-  int cantidad;
+  int cantidad = 1;
 
   _ItemBoutique({
     required this.productoId,
@@ -2818,7 +2808,6 @@ class _ItemBoutique {
     required this.precioUnitario,
     required this.stockDisponible,
     this.talla = 'N/A',
-    this.cantidad = 1,
   });
 
   double get subtotal => precioUnitario * cantidad;

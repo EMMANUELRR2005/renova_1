@@ -37,15 +37,15 @@ void main() async {
   if (!kIsWeb) {
     try {
       await FirebaseFirestore.instance.clearPersistence();
-      print('✅ [Main] Caché Firestore limpiada');
+      debugPrint('✅ [Main] Caché Firestore limpiada');
     } catch (e) {
-      print('⚠️ [Main] clearPersistence: $e');
+      debugPrint('⚠️ [Main] clearPersistence: $e');
     }
   }
 
   // Seed en background — no bloquea el arranque aunque Firestore tarde
   SeedService().seedTodo().catchError((e) {
-    print('⚠️ [Main] Seed falló pero la app continúa: $e');
+    debugPrint('⚠️ [Main] Seed falló pero la app continúa: $e');
   });
 
   // Bloquear orientación a landscape (solo en mobile, no en web)

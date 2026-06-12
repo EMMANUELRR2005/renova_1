@@ -111,7 +111,7 @@ Widget buildSectionCard({
                   ],
                 ),
               ),
-              if (trailing != null) trailing,
+              ?trailing,
             ],
           ),
         ),

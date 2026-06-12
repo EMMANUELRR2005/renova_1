@@ -324,7 +324,9 @@ class _EditarPacienteScreenState extends ConsumerState<EditarPacienteScreen> {
     final hoy = DateTime.now();
     int edad = hoy.year - nac.year;
     if (hoy.month < nac.month ||
-        (hoy.month == nac.month && hoy.day < nac.day)) edad--;
+        (hoy.month == nac.month && hoy.day < nac.day)) {
+      edad--;
+    }
     return edad;
   }
 
@@ -736,7 +738,7 @@ class _DropdownField extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return DropdownButtonFormField<String>(
-      value: value,
+      initialValue: value,
       decoration: InputDecoration(labelText: label),
       items: items.map((i) => DropdownMenuItem(value: i, child: Text(i))).toList(),
       onChanged: onChanged,

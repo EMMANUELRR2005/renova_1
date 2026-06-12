@@ -9,12 +9,12 @@ class SectionHeader extends StatelessWidget {
   final IconData? buttonIcon;
 
   const SectionHeader({
-    Key? key,
+    super.key,
     required this.title,
     this.onButtonPressed,
     this.buttonLabel,
     this.buttonIcon,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {

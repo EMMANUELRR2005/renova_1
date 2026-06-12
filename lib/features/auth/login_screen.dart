@@ -15,7 +15,7 @@ const _azul = Color(0xFF1E3A5F);
 const _dorado = Color(0xFFC9A96E);
 
 class LoginScreen extends ConsumerStatefulWidget {
-  const LoginScreen({Key? key}) : super(key: key);
+  const LoginScreen({super.key});
 
   @override
   ConsumerState<LoginScreen> createState() => _LoginScreenState();
@@ -493,7 +493,7 @@ class _CarruselLoginState extends State<_CarruselLogin> {
             itemBuilder: (_, i) => Image.asset(
               _slides[i]['imagen']!,
               fit: BoxFit.cover,
-              errorBuilder: (_, __, ___) => Container(color: _azul),
+              errorBuilder: (_, _, _) => Container(color: _azul),
             ),
           ),
           // Overlay gradiente para legibilidad del texto.

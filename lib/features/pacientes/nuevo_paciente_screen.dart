@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -12,6 +13,8 @@ import '../../core/widgets/app_shell.dart';
 import '../../core/widgets/widgets_comunes.dart';
 import '../../data/mock/mock_data.dart';
 import '../../data/mock/providers.dart';
+import '../../data/services/cita_service.dart';
+import '../../data/services/notificacion_service.dart';
 import '../../features/auth/providers/auth_provider.dart';
 
 class NuevoPacienteScreen extends ConsumerStatefulWidget {
@@ -52,18 +55,73 @@ class _NuevoPacienteScreenState extends ConsumerState<NuevoPacienteScreen> {
   final _contactoTelCtrl = TextEditingController();
   String _contactoRelacion = 'familiar';
 
-  // Servicio y Clínica (nuevos campos obligatorios)
+  // Servicio y Clínica — valores fijos (Odontología / Clínica Renova Sur)
   String? _servicioId;
-  String? _servicioNombre;
   String? _clinicaId;
-  String? _clinicaNombre;
+  bool _inicializando = true;
+
+  // Agendar primera cita (opcional)
+  bool _agendarCita = false;
+  DateTime? _fechaCita;
+  TimeOfDay? _horaCita;
+  String? _doctoraId;
+  String? _doctoraNombre;
+  final _motivoCitaCtrl = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _inicializarServicioClinica();
+  }
+
+  /// Busca (o crea) Odontología y Clínica Renova Sur en Firestore.
+  Future<void> _inicializarServicioClinica() async {
+    try {
+      // Servicio: Odontología
+      final sSnap = await FirebaseFirestore.instance
+          .collection('servicios')
+          .where('nombre', isEqualTo: 'Odontología')
+          .limit(1)
+          .get();
+      if (sSnap.docs.isNotEmpty) {
+        _servicioId = sSnap.docs.first.id;
+      } else {
+        final ref = FirebaseFirestore.instance.collection('servicios').doc();
+        await ref.set(
+            {'nombre': 'Odontología', 'activo': true, 'descripcion': ''});
+        _servicioId = ref.id;
+      }
+
+      // Clínica: Clínica Renova Sur
+      final cSnap = await FirebaseFirestore.instance
+          .collection('clinicas')
+          .where('nombre', isEqualTo: 'Clínica Renova Sur')
+          .limit(1)
+          .get();
+      if (cSnap.docs.isNotEmpty) {
+        _clinicaId = cSnap.docs.first.id;
+      } else {
+        final ref = FirebaseFirestore.instance.collection('clinicas').doc();
+        await ref.set({
+          'nombre': 'Clínica Renova Sur',
+          'activo': true,
+          'direccion': ''
+        });
+        _clinicaId = ref.id;
+      }
+    } catch (e) {
+      debugPrint('⚠️ Error inicializando servicio/clínica: $e');
+    } finally {
+      if (mounted) setState(() => _inicializando = false);
+    }
+  }
 
   @override
   void dispose() {
     for (final c in [
       _nombreCtrl, _apellidoCtrl, _emailCtrl, _telefonoCtrl, _numIdCtrl,
       _direccionCtrl, _ciudadCtrl, _alergiasCtrl, _condicionesCtrl,
-      _contactoNombreCtrl, _contactoTelCtrl,
+      _contactoNombreCtrl, _contactoTelCtrl, _motivoCitaCtrl,
     ]) { c.dispose(); }
     super.dispose();
   }
@@ -283,12 +341,8 @@ class _NuevoPacienteScreenState extends ConsumerState<NuevoPacienteScreen> {
       _showError('Selecciona la fecha de nacimiento');
       return;
     }
-    if (_servicioId == null || _servicioNombre == null) {
-      _showError('Selecciona un servicio');
-      return;
-    }
-    if (_clinicaId == null || _clinicaNombre == null) {
-      _showError('Selecciona una clínica');
+    if (_inicializando || _servicioId == null || _clinicaId == null) {
+      _showError('Espera un momento, cargando datos...');
       return;
     }
 
@@ -321,8 +375,8 @@ class _NuevoPacienteScreenState extends ConsumerState<NuevoPacienteScreen> {
 
       // PASO 2: Crear paciente con la URL de la foto
       debugPrint('🔵 Creando paciente en Firestore...');
-      debugPrint('🔵 Servicio: $_servicioNombre (ID: $_servicioId)');
-      debugPrint('🔵 Clínica: $_clinicaNombre (ID: $_clinicaId)');
+      debugPrint('🔵 Servicio: Odontología (ID: $_servicioId)');
+      debugPrint('🔵 Clínica: Clínica Renova Sur (ID: $_clinicaId)');
       final paciente = Paciente(
         id: '',
         nombre: _nombreCtrl.text.trim(),
@@ -345,21 +399,31 @@ class _NuevoPacienteScreenState extends ConsumerState<NuevoPacienteScreen> {
         ),
         estado: 'activo',
         registradoPor: usuario?.id ?? '',
-        servicio: _servicioNombre,
+        servicio: 'Odontología',
         servicioId: _servicioId,
-        clinica: _clinicaNombre,
+        clinica: 'Clínica Renova Sur',
         clinicaId: _clinicaId,
         fotoUrl: fotoUrl,
       );
 
       final nuevoId = await service.crearPaciente(paciente);
       debugPrint('✅ Paciente creado con ID: $nuevoId');
-      debugPrint('✅ fotoUrl guardada: $fotoUrl');
+
+      // Crear cita inicial si se solicitó.
+      if (_agendarCita && _fechaCita != null && _doctoraId != null) {
+        try {
+          await _crearCitaInicial(nuevoId, usuario?.id ?? '');
+        } catch (e) {
+          debugPrint('⚠️ Error creando cita inicial: $e');
+        }
+      }
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Paciente registrado exitosamente'),
+          SnackBar(
+            content: Text(_agendarCita && _fechaCita != null
+                ? 'Paciente registrado y cita agendada'
+                : 'Paciente registrado exitosamente'),
             backgroundColor: AppColors.success,
           ),
         );
@@ -372,6 +436,73 @@ class _NuevoPacienteScreenState extends ConsumerState<NuevoPacienteScreen> {
     } finally {
       if (mounted) setState(() => _guardando = false);
     }
+  }
+
+  Future<void> _crearCitaInicial(
+      String pacienteId, String creadoPorId) async {
+    final fechaHora = DateTime(
+      _fechaCita!.year,
+      _fechaCita!.month,
+      _fechaCita!.day,
+      _horaCita?.hour ?? 9,
+      _horaCita?.minute ?? 0,
+    );
+    final horaStr = _horaCita != null
+        ? '${_horaCita!.hour.toString().padLeft(2, '0')}:${_horaCita!.minute.toString().padLeft(2, '0')}'
+        : '09:00';
+    final diaStr =
+        '${_fechaCita!.day.toString().padLeft(2, '0')}/${_fechaCita!.month.toString().padLeft(2, '0')}/${_fechaCita!.year}';
+    final nombrePaciente =
+        '${_nombreCtrl.text.trim()} ${_apellidoCtrl.text.trim()}';
+
+    final citaId = await CitaService().crearCitaMedica(CitaMedica(
+      id: '',
+      pacienteId: pacienteId,
+      nombrePaciente: nombrePaciente,
+      servicio: 'Odontología',
+      servicioId: _servicioId ?? '',
+      clinica: 'Clínica Renova Sur',
+      clinicaId: _clinicaId ?? '',
+      doctora: _doctoraNombre,
+      doctoraId: _doctoraId,
+      fecha: fechaHora,
+      hora: horaStr,
+      motivo: _motivoCitaCtrl.text.trim().isEmpty
+          ? 'Primera consulta'
+          : _motivoCitaCtrl.text.trim(),
+      estado: 'pendiente',
+      creadaPor: creadoPorId,
+    ));
+
+    if (_doctoraId != null && _doctoraId!.isNotEmpty) {
+      await NotificacionService().crearNotificacionCita(
+        doctoraId: _doctoraId!,
+        nombrePaciente: nombrePaciente,
+        fecha: diaStr,
+        hora: horaStr,
+        citaId: citaId,
+        pacienteId: pacienteId,
+      );
+    }
+  }
+
+  Future<void> _seleccionarFechaCita() async {
+    final hoy = DateTime.now();
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: hoy.add(const Duration(days: 1)),
+      firstDate: hoy,
+      lastDate: DateTime(hoy.year + 2),
+    );
+    if (picked != null) setState(() => _fechaCita = picked);
+  }
+
+  Future<void> _seleccionarHoraCita() async {
+    final picked = await showTimePicker(
+      context: context,
+      initialTime: _horaCita ?? const TimeOfDay(hour: 9, minute: 0),
+    );
+    if (picked != null) setState(() => _horaCita = picked);
   }
 
   void _showError(String msg) {
@@ -487,7 +618,7 @@ class _NuevoPacienteScreenState extends ConsumerState<NuevoPacienteScreen> {
                                 Text(
                                   _fechaNac == null
                                       ? 'Seleccionar fecha'
-                                      : '${_formatFecha(_fechaNac!)}  (${_edad} años)',
+                                      : '${_formatFecha(_fechaNac!)}  ($_edad años)',
                                   style: TextStyle(
                                     fontSize: 14,
                                     color: _fechaNac == null
@@ -588,16 +719,19 @@ class _NuevoPacienteScreenState extends ConsumerState<NuevoPacienteScreen> {
                 ],
               ),
               const SizedBox(height: 16),
-              // ── Servicio y Clínica (Obligatorios) ───────────────────────
+              // ── Servicio y Clínica (valores fijos) ──────────────────────
               _SectionCard(
-                title: 'Asignación de Servicio y Clínica *',
+                title: 'Servicio y Clínica',
                 children: [
                   _Row2(
-                    left: _buildServicioDropdown(),
-                    right: _buildClinicaDropdown(),
+                    left: _buildServicioFijo(),
+                    right: _buildClinicaFija(),
                   ),
                 ],
               ),
+              const SizedBox(height: 16),
+              // ── Agendar primera cita (opcional) ────────────────────────
+              _buildSeccionCitaOpcional(),
               const SizedBox(height: 24),
               // ── Botones de Acción ───────────────────────────────────────
               Row(
@@ -675,77 +809,243 @@ class _NuevoPacienteScreenState extends ConsumerState<NuevoPacienteScreen> {
         fontFamily: GoogleFonts.dmSans().fontFamily,
       );
 
-  Widget _buildServicioDropdown() {
-    final serviciosAsync = ref.watch(serviciosStreamProvider);
-    return serviciosAsync.when(
-      loading: () => const Center(child: CircularProgressIndicator()),
-      error: (e, _) => Text('Error: $e'),
-      data: (servicios) {
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Servicio *', style: _labelStyle()),
-            const SizedBox(height: 6),
-            DropdownButtonFormField<String>(
-              value: _servicioId,
-              decoration: const InputDecoration(
-                hintText: 'Selecciona un servicio',
+  Widget _buildServicioFijo() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Servicio', style: _labelStyle()),
+        const SizedBox(height: 6),
+        Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: Colors.grey[50],
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: Colors.grey.shade300),
+          ),
+          child: Row(
+            children: [
+              const Icon(Icons.medical_services_outlined,
+                  color: AppColors.primary),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Servicio',
+                        style: TextStyle(fontSize: 11, color: Colors.grey[600])),
+                    const Text('Odontología',
+                        style: TextStyle(
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.primary)),
+                  ],
+                ),
               ),
-              validator: (v) => v == null ? 'Campo requerido' : null,
-              items: servicios
-                  .map((s) => DropdownMenuItem(
-                        value: s.id,
-                        child: Text(s.nombre),
-                      ))
-                  .toList(),
-              onChanged: (v) {
-                final servicio = servicios.firstWhere((s) => s.id == v);
-                setState(() {
-                  _servicioId = v;
-                  _servicioNombre = servicio.nombre;
-                });
-              },
-            ),
-          ],
-        );
-      },
+              _inicializando
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2))
+                  : const Icon(Icons.lock_outline,
+                      color: Colors.grey, size: 16),
+            ],
+          ),
+        ),
+      ],
     );
   }
 
-  Widget _buildClinicaDropdown() {
-    final clinicasAsync = ref.watch(clinicasStreamProvider);
-    return clinicasAsync.when(
-      loading: () => const Center(child: CircularProgressIndicator()),
-      error: (e, _) => Text('Error: $e'),
-      data: (clinicas) {
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Clínica *', style: _labelStyle()),
-            const SizedBox(height: 6),
-            DropdownButtonFormField<String>(
-              value: _clinicaId,
-              decoration: const InputDecoration(
-                hintText: 'Selecciona una clínica',
+  Widget _buildClinicaFija() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Clínica', style: _labelStyle()),
+        const SizedBox(height: 6),
+        Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: Colors.grey[50],
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: Colors.grey.shade300),
+          ),
+          child: Row(
+            children: [
+              const Icon(Icons.local_hospital_outlined,
+                  color: AppColors.primary),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Clínica',
+                        style: TextStyle(fontSize: 11, color: Colors.grey[600])),
+                    const Text('Clínica Renova Sur',
+                        style: TextStyle(
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.primary)),
+                  ],
+                ),
               ),
-              validator: (v) => v == null ? 'Campo requerido' : null,
-              items: clinicas
-                  .map((c) => DropdownMenuItem(
-                        value: c.id,
-                        child: Text(c.nombre),
-                      ))
-                  .toList(),
-              onChanged: (v) {
-                final clinica = clinicas.firstWhere((c) => c.id == v);
-                setState(() {
-                  _clinicaId = v;
-                  _clinicaNombre = clinica.nombre;
-                });
-              },
+              _inicializando
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2))
+                  : const Icon(Icons.lock_outline,
+                      color: Colors.grey, size: 16),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSeccionCitaOpcional() {
+    final doctorasAsync = ref.watch(doctorasStreamProvider);
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.primary.withValues(alpha: 0.05),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+            color: AppColors.primary.withValues(alpha: 0.2)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Toggle
+          Row(
+            children: [
+              const Icon(Icons.calendar_month_rounded,
+                  color: AppColors.primary),
+              const SizedBox(width: 8),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Agendar primera cita',
+                        style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.primary)),
+                    Text('Opcional · puedes agendarla después',
+                        style: TextStyle(
+                            fontSize: 12,
+                            color: AppColors.textSecondary)),
+                  ],
+                ),
+              ),
+              Switch(
+                value: _agendarCita,
+                activeThumbColor: AppColors.primary,
+                onChanged: (v) => setState(() => _agendarCita = v),
+              ),
+            ],
+          ),
+          if (_agendarCita) ...[
+            const Divider(height: 24),
+            // Fecha
+            GestureDetector(
+              onTap: _seleccionarFechaCita,
+              child: Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  border: Border.all(color: Colors.grey.shade300),
+                  borderRadius: BorderRadius.circular(8),
+                  color: Colors.white,
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.calendar_today,
+                        size: 18, color: AppColors.primary),
+                    const SizedBox(width: 8),
+                    Text(
+                      _fechaCita != null
+                          ? '${_fechaCita!.day.toString().padLeft(2, '0')}/${_fechaCita!.month.toString().padLeft(2, '0')}/${_fechaCita!.year}'
+                          : 'Seleccionar fecha *',
+                      style: TextStyle(
+                          color: _fechaCita != null
+                              ? AppColors.textPrimary
+                              : Colors.grey),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            // Hora
+            GestureDetector(
+              onTap: _seleccionarHoraCita,
+              child: Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  border: Border.all(color: Colors.grey.shade300),
+                  borderRadius: BorderRadius.circular(8),
+                  color: Colors.white,
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.access_time,
+                        size: 18, color: AppColors.primary),
+                    const SizedBox(width: 8),
+                    Text(
+                      _horaCita != null
+                          ? _horaCita!.format(context)
+                          : 'Seleccionar hora',
+                      style: TextStyle(
+                          color: _horaCita != null
+                              ? AppColors.textPrimary
+                              : Colors.grey),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            // Doctora
+            doctorasAsync.when(
+              loading: () =>
+                  const Center(child: CircularProgressIndicator()),
+              error: (e, _) =>
+                  Text('Error: $e', style: const TextStyle(fontSize: 12)),
+              data: (doctoras) => DropdownButtonFormField<String>(
+                initialValue: doctoras.any((d) => d.id == _doctoraId)
+                    ? _doctoraId
+                    : null,
+                decoration: const InputDecoration(
+                  labelText: 'Doctora asignada *',
+                  prefixIcon: Icon(Icons.person_outlined),
+                  border: OutlineInputBorder(),
+                  isDense: true,
+                ),
+                items: doctoras
+                    .map((d) => DropdownMenuItem(
+                          value: d.id,
+                          child: Text(d.nombre),
+                        ))
+                    .toList(),
+                onChanged: (v) {
+                  final d = doctoras.firstWhere((x) => x.id == v);
+                  setState(() {
+                    _doctoraId = v;
+                    _doctoraNombre = d.nombre;
+                  });
+                },
+              ),
+            ),
+            const SizedBox(height: 8),
+            // Motivo
+            TextField(
+              controller: _motivoCitaCtrl,
+              decoration: const InputDecoration(
+                labelText: 'Motivo (opcional)',
+                hintText: 'Ej: Primera consulta',
+                prefixIcon: Icon(Icons.note_outlined),
+                border: OutlineInputBorder(),
+                isDense: true,
+              ),
             ),
           ],
-        );
-      },
+        ],
+      ),
     );
   }
 }
@@ -856,7 +1156,7 @@ class _Dropdown extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return DropdownButtonFormField<String>(
-      value: value,
+      initialValue: value,
       decoration: InputDecoration(labelText: label),
       items: items
           .map((i) => DropdownMenuItem(value: i, child: Text(i)))

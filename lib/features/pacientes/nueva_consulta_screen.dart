@@ -20,33 +20,6 @@ class NuevaConsultaScreen extends ConsumerStatefulWidget {
       _NuevaConsultaScreenState();
 }
 
-class _MedicamentoRow {
-  final nombreCtrl = TextEditingController();
-  final dosisCtrl = TextEditingController();
-  final frecuenciaCtrl = TextEditingController();
-  final duracionCtrl = TextEditingController();
-
-  void dispose() {
-    nombreCtrl.dispose();
-    dosisCtrl.dispose();
-    frecuenciaCtrl.dispose();
-    duracionCtrl.dispose();
-  }
-
-  bool get vacio =>
-      nombreCtrl.text.trim().isEmpty &&
-      dosisCtrl.text.trim().isEmpty &&
-      frecuenciaCtrl.text.trim().isEmpty &&
-      duracionCtrl.text.trim().isEmpty;
-
-  Medicamento toMedicamento() => Medicamento(
-        nombre: nombreCtrl.text.trim(),
-        dosis: dosisCtrl.text.trim(),
-        frecuencia: frecuenciaCtrl.text.trim(),
-        duracion: duracionCtrl.text.trim(),
-      );
-}
-
 class _ProcedimientoRow {
   String servicioId = '';
   final nombreCtrl = TextEditingController();
@@ -77,16 +50,14 @@ class _NuevaConsultaScreenState extends ConsumerState<NuevaConsultaScreen> {
   final _formKey = GlobalKey<FormState>();
   bool _guardando = false;
 
-  final _motivoCtrl = TextEditingController();
-  final _sintomasCtrl = TextEditingController();
-  final _diagnosticoCtrl = TextEditingController();
-  final _tratamientoCtrl = TextEditingController();
-  final _comentariosCtrl = TextEditingController();
-  final _proximaCitaCtrl = TextEditingController();
-  final _notasPrivadasCtrl = TextEditingController();
+  // Sección 1: área del servicio y notas
+  final _areaCtrl = TextEditingController();
   final _notasCajaCtrl = TextEditingController();
 
-  final List<_MedicamentoRow> _medicamentos = [];
+  // Sección 4: próxima cita
+  bool _mostrarProximaCita = false;
+  final _proximaCitaCtrl = TextEditingController();
+
   final List<_ProcedimientoRow> _procedimientos = [];
   // Medicamentos de farmacia recetados (van a caja y descuentan inventario).
   final List<Map<String, dynamic>> _medsFarmacia = [];
@@ -94,7 +65,7 @@ class _NuevaConsultaScreenState extends ConsumerState<NuevaConsultaScreen> {
   List<ServicioClinica> _servicios = [];
 
   double get _totalProcedimientos =>
-      _procedimientos.fold(0.0, (acc, p) => acc + p.precio);
+      _procedimientos.fold(0.0, (total, p) => total + p.precio);
 
   double get _totalMedsFarmacia =>
       _medsFarmacia.fold(0.0, (acc, m) => acc + ((m['subtotal'] as num?) ?? 0).toDouble());
@@ -120,23 +91,11 @@ class _NuevaConsultaScreenState extends ConsumerState<NuevaConsultaScreen> {
 
   @override
   void dispose() {
-    for (final c in [
-      _motivoCtrl, _sintomasCtrl, _diagnosticoCtrl,
-      _tratamientoCtrl, _comentariosCtrl, _proximaCitaCtrl,
-      _notasPrivadasCtrl, _notasCajaCtrl,
-    ]) { c.dispose(); }
-    for (final m in _medicamentos) { m.dispose(); }
+    for (final c in [_areaCtrl, _notasCajaCtrl, _proximaCitaCtrl]) {
+      c.dispose();
+    }
     for (final p in _procedimientos) { p.dispose(); }
     super.dispose();
-  }
-
-  void _agregarMedicamento() {
-    setState(() => _medicamentos.add(_MedicamentoRow()));
-  }
-
-  void _eliminarMedicamento(int index) {
-    _medicamentos[index].dispose();
-    setState(() => _medicamentos.removeAt(index));
   }
 
   void _agregarProcedimiento() {
@@ -150,14 +109,6 @@ class _NuevaConsultaScreenState extends ConsumerState<NuevaConsultaScreen> {
 
   Future<void> _guardar() async {
     if (!_formKey.currentState!.validate()) return;
-
-    // Validar medicamentos no vacíos a medias
-    for (final m in _medicamentos) {
-      if (!m.vacio && m.nombreCtrl.text.trim().isEmpty) {
-        _showMsg('Completa el nombre del medicamento', error: true);
-        return;
-      }
-    }
 
     // Validar procedimientos: nombre y precio requeridos por fila agregada.
     for (final p in _procedimientos) {
@@ -179,12 +130,11 @@ class _NuevaConsultaScreenState extends ConsumerState<NuevaConsultaScreen> {
       final service = ref.read(pacienteServiceProvider);
       final pacienteId = ref.read(selectedPacienteIdProvider)!;
 
-      final meds = _medicamentos
-          .where((m) => !m.vacio)
-          .map((m) => m.toMedicamento())
-          .toList();
-
       final esDoctora = usuario?.rol == RolUsuario.doctora;
+      final proximaCita = (_mostrarProximaCita &&
+              _proximaCitaCtrl.text.trim().isNotEmpty)
+          ? _proximaCitaCtrl.text.trim()
+          : null;
 
       // ── Flujo con procedimientos/medicamentos: se envía a caja para cobro ───
       if (_hayItemsCobro) {
@@ -223,18 +173,14 @@ class _NuevaConsultaScreenState extends ConsumerState<NuevaConsultaScreen> {
               totalEstimado: _totalCobro,
               doctoraId: usuario?.id ?? '',
               nombreDoctora: usuario?.nombre ?? '',
-              motivo: _motivoCtrl.text.trim(),
-              diagnostico: _diagnosticoCtrl.text.trim(),
-              tratamiento: _tratamientoCtrl.text.trim(),
-              comentarios:
-                  '${_sintomasCtrl.text.trim()}\n${_comentariosCtrl.text.trim()}'
-                      .trim(),
-              medicamentos: meds.map((m) => m.toMap()).toList(),
-              notasPrivadas: _notasPrivadasCtrl.text.trim(),
+              motivo: _areaCtrl.text.trim(),
+              diagnostico: '',
+              tratamiento: '',
+              comentarios: '',
+              medicamentos: const [],
+              notasPrivadas: '',
               notasParaCaja: _notasCajaCtrl.text.trim(),
-              proximaCita: _proximaCitaCtrl.text.trim().isEmpty
-                  ? null
-                  : _proximaCitaCtrl.text.trim(),
+              proximaCita: proximaCita,
               clinicaId: paciente?.clinicaId ?? '',
               clinica: paciente?.clinica ?? '',
               rolCreador: usuario?.rol.name ?? 'doctora',
@@ -252,24 +198,22 @@ class _NuevaConsultaScreenState extends ConsumerState<NuevaConsultaScreen> {
         return;
       }
 
-      // ── Flujo simple (sin procedimientos): solo historial ──────────────────
+      // ── Flujo simple (sin ítems a cobrar): solo historial ─────────────────
       final entrada = HistorialConsulta(
         id: '',
-        tipo: 'consulta',
-        motivo: _motivoCtrl.text.trim(),
-        comentarios: '${_sintomasCtrl.text.trim()}\n${_comentariosCtrl.text.trim()}'.trim(),
-        diagnostico: _diagnosticoCtrl.text.trim(),
-        tratamiento: _tratamientoCtrl.text.trim(),
-        medicamentos: meds,
+        tipo: 'consulta_medica',
+        motivo: _areaCtrl.text.trim(),
+        comentarios: '',
+        diagnostico: '',
+        tratamiento: '',
+        medicamentos: const [],
         doctora: esDoctora ? (usuario?.nombre ?? '') : '',
         doctoraUid: esDoctora ? (usuario?.id ?? '') : '',
         enfermera: !esDoctora ? (usuario?.nombre ?? '') : '',
         enfermeraUid: !esDoctora ? (usuario?.id ?? '') : '',
         creadoPor: usuario?.id ?? '',
         rolCreador: usuario?.rol.name ?? '',
-        proximaCita: _proximaCitaCtrl.text.trim().isEmpty
-            ? null
-            : _proximaCitaCtrl.text.trim(),
+        proximaCita: proximaCita,
       );
 
       await service.agregarEntradaHistorial(pacienteId, entrada);
@@ -321,7 +265,7 @@ class _NuevaConsultaScreenState extends ConsumerState<NuevaConsultaScreen> {
                   ),
                   const SizedBox(width: 8),
                   Text(
-                    'Nueva Consulta Médica',
+                    'Nuevo Servicio',
                     style: TextStyle(
                       fontSize: 24,
                       fontWeight: FontWeight.bold,
@@ -332,180 +276,34 @@ class _NuevaConsultaScreenState extends ConsumerState<NuevaConsultaScreen> {
                 ],
               ),
               const SizedBox(height: 20),
-              // ── Consulta ──────────────────────────────────────────────
+              // ── Sección 1: Servicio Realizado ─────────────────────────
               _SectionCard(
-                title: 'Datos de la Consulta',
+                title: 'Servicio Realizado',
                 children: [
                   TextFormField(
-                    controller: _motivoCtrl,
+                    controller: _areaCtrl,
                     decoration: const InputDecoration(
-                        labelText: 'Motivo de la consulta *'),
+                        labelText: 'Área / Procedimiento *',
+                        hintText:
+                            'Ej: Blanqueamiento dental, Limpieza profunda'),
                     validator: (v) =>
                         (v == null || v.trim().isEmpty) ? 'Requerido' : null,
-                  ),
-                  const SizedBox(height: 12),
-                  TextFormField(
-                    controller: _sintomasCtrl,
-                    maxLines: 3,
-                    decoration: const InputDecoration(
-                        labelText: 'Síntomas observados'),
-                  ),
-                  const SizedBox(height: 12),
-                  TextFormField(
-                    controller: _diagnosticoCtrl,
-                    maxLines: 2,
-                    decoration:
-                        const InputDecoration(labelText: 'Diagnóstico *'),
-                    validator: (v) =>
-                        (v == null || v.trim().isEmpty) ? 'Requerido' : null,
-                  ),
-                  const SizedBox(height: 12),
-                  TextFormField(
-                    controller: _tratamientoCtrl,
-                    maxLines: 2,
-                    decoration: const InputDecoration(
-                        labelText: 'Tratamiento prescrito *'),
-                    validator: (v) =>
-                        (v == null || v.trim().isEmpty) ? 'Requerido' : null,
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              // ── Medicamentos ──────────────────────────────────────────
-              _SectionCard(
-                title: 'Medicamentos',
-                children: [
-                  if (_medicamentos.isEmpty)
-                    Text(
-                      'No hay medicamentos agregados',
-                      style: TextStyle(
-                          color: AppColors.textSecondary,
-                          fontFamily: GoogleFonts.dmSans().fontFamily),
-                    )
-                  else ...[
-                    // Encabezados de columnas
-                    Row(
-                      children: [
-                        _MedHeader('Medicamento', flex: 3),
-                        _MedHeader('Dosis', flex: 2),
-                        _MedHeader('Frecuencia', flex: 2),
-                        _MedHeader('Días', flex: 2),
-                        const SizedBox(width: 40),
-                      ],
-                    ),
-                    const SizedBox(height: 6),
-                    ..._medicamentos.asMap().entries.map((entry) {
-                      final i = entry.key;
-                      final m = entry.value;
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: 8),
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.center,
-                          children: [
-                            Expanded(
-                              flex: 3,
-                              child: TextFormField(
-                                controller: m.nombreCtrl,
-                                decoration: const InputDecoration(
-                                    hintText: 'Nombre',
-                                    contentPadding: EdgeInsets.symmetric(
-                                        horizontal: 10, vertical: 8)),
-                              ),
-                            ),
-                            const SizedBox(width: 6),
-                            Expanded(
-                              flex: 2,
-                              child: TextFormField(
-                                controller: m.dosisCtrl,
-                                decoration: const InputDecoration(
-                                    hintText: 'Dosis',
-                                    contentPadding: EdgeInsets.symmetric(
-                                        horizontal: 10, vertical: 8)),
-                              ),
-                            ),
-                            const SizedBox(width: 6),
-                            Expanded(
-                              flex: 2,
-                              child: TextFormField(
-                                controller: m.frecuenciaCtrl,
-                                decoration: const InputDecoration(
-                                    hintText: 'Frecuencia',
-                                    contentPadding: EdgeInsets.symmetric(
-                                        horizontal: 10, vertical: 8)),
-                              ),
-                            ),
-                            const SizedBox(width: 6),
-                            Expanded(
-                              flex: 2,
-                              child: TextFormField(
-                                controller: m.duracionCtrl,
-                                keyboardType: TextInputType.number,
-                                decoration: const InputDecoration(
-                                    hintText: 'Días',
-                                    contentPadding: EdgeInsets.symmetric(
-                                        horizontal: 10, vertical: 8)),
-                              ),
-                            ),
-                            const SizedBox(width: 4),
-                            IconButton(
-                              icon: const Icon(Icons.remove_circle_outline,
-                                  color: AppColors.danger, size: 20),
-                              onPressed: () => _eliminarMedicamento(i),
-                              padding: EdgeInsets.zero,
-                            ),
-                          ],
-                        ),
-                      );
-                    }),
-                  ],
-                  const SizedBox(height: 8),
-                  TextButton.icon(
-                    onPressed: _agregarMedicamento,
-                    icon: const Icon(Icons.add, size: 18),
-                    label: const Text('Agregar medicamento'),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              // ── Procedimientos y medicamentos de farmacia (van a caja) ──
-              _buildSeccionCobroCaja(),
-              const SizedBox(height: 16),
-              // ── Notas adicionales ─────────────────────────────────────
-              _SectionCard(
-                title: 'Notas Adicionales',
-                children: [
-                  TextFormField(
-                    controller: _comentariosCtrl,
-                    maxLines: 4,
-                    decoration: const InputDecoration(
-                        labelText: 'Comentarios adicionales'),
-                  ),
-                  const SizedBox(height: 12),
-                  TextFormField(
-                    controller: _notasPrivadasCtrl,
-                    maxLines: 2,
-                    decoration: const InputDecoration(
-                      labelText: 'Notas privadas (solo la doctora)',
-                    ),
                   ),
                   const SizedBox(height: 12),
                   TextFormField(
                     controller: _notasCajaCtrl,
                     maxLines: 2,
                     decoration: const InputDecoration(
-                      labelText: 'Notas para caja (instrucciones de cobro)',
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  TextFormField(
-                    controller: _proximaCitaCtrl,
-                    decoration: const InputDecoration(
-                      labelText: 'Próxima cita (opcional)',
-                      hintText: 'Ej: 2026-06-15 o "En 2 semanas"',
-                    ),
+                        labelText: 'Notas para secretaria / caja (opcional)'),
                   ),
                 ],
               ),
+              const SizedBox(height: 16),
+              // ── Sección 2+3: Procedimientos y Medicamentos (→ caja) ───
+              _buildSeccionCobroCaja(),
+              const SizedBox(height: 16),
+              // ── Sección 4: Próxima cita ───────────────────────────────
+              _buildSeccionProximaCita(),
               const SizedBox(height: 24),
               SizedBox(
                 width: double.infinity,
@@ -520,7 +318,7 @@ class _NuevaConsultaScreenState extends ConsumerState<NuevaConsultaScreen> {
                         )
                       : Text(_hayItemsCobro
                           ? 'Guardar y enviar a caja'
-                          : 'Guardar Consulta'),
+                          : 'Guardar Servicio'),
                 ),
               ),
             ],
@@ -764,6 +562,42 @@ class _NuevaConsultaScreenState extends ConsumerState<NuevaConsultaScreen> {
     );
   }
 
+  Widget _buildSeccionProximaCita() {
+    return _SectionCard(
+      title: 'Próxima Cita',
+      children: [
+        Row(
+          children: [
+            const Icon(Icons.calendar_month, size: 18, color: AppColors.primary),
+            const SizedBox(width: 8),
+            const Expanded(
+              child: Text('Agendar próxima cita',
+                  style: TextStyle(
+                      fontWeight: FontWeight.w500,
+                      color: AppColors.primary)),
+            ),
+            Switch(
+              value: _mostrarProximaCita,
+              activeThumbColor: AppColors.primary,
+              onChanged: (v) => setState(() => _mostrarProximaCita = v),
+            ),
+          ],
+        ),
+        if (_mostrarProximaCita) ...[
+          const SizedBox(height: 12),
+          TextFormField(
+            controller: _proximaCitaCtrl,
+            decoration: const InputDecoration(
+              labelText: 'Fecha / Indicación',
+              hintText: 'Ej: 2026-07-15 o "En 2 semanas"',
+              isDense: true,
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
   Future<void> _abrirBuscadorFarmacia() async {
     await showModalBottomSheet(
       context: context,
@@ -984,7 +818,7 @@ class _ItemMedState extends State<_ItemMed> {
               ? CachedNetworkImage(
                   imageUrl: med.fotoUrl,
                   fit: BoxFit.cover,
-                  errorWidget: (_, __, ___) => _iconMed(),
+                  errorWidget: (_, _, _) => _iconMed(),
                 )
               : _iconMed(),
         ),
@@ -1079,20 +913,3 @@ class _SectionCard extends StatelessWidget {
   }
 }
 
-class _MedHeader extends StatelessWidget {
-  final String label;
-  final int flex;
-  const _MedHeader(this.label, {required this.flex});
-
-  @override
-  Widget build(BuildContext context) {
-    return Expanded(
-      flex: flex,
-      child: Text(label,
-          style: const TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w600,
-              color: AppColors.textSecondary)),
-    );
-  }
-}

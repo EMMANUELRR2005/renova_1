@@ -1,4 +1,3 @@
-import 'dart:typed_data';
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:firebase_storage/firebase_storage.dart';
@@ -367,7 +366,7 @@ class _ProductoCard extends StatelessWidget {
                     ? CachedNetworkImage(
                         imageUrl: producto.fotoUrl,
                         fit: BoxFit.cover,
-                        errorWidget: (_, __, ___) => _placeholder(),
+                        errorWidget: (_, _, _) => _placeholder(),
                       )
                     : _placeholder(),
               ),
@@ -824,7 +823,7 @@ class _FormularioProductoDialogState
                       ? CachedNetworkImage(
                           imageUrl: _fotoUrl!,
                           fit: BoxFit.cover,
-                          errorWidget: (_, __, ___) => const Icon(
+                          errorWidget: (_, _, _) => const Icon(
                               Icons.checkroom_outlined,
                               size: 44,
                               color: Colors.grey))
@@ -977,7 +976,7 @@ class _FormularioProductoDialogState
   Widget _dropdown(String label, String value, List<String> items,
       ValueChanged<String?> onChanged) {
     return DropdownButtonFormField<String>(
-      value: items.contains(value) ? value : items.first,
+      initialValue: items.contains(value) ? value : items.first,
       decoration: InputDecoration(labelText: label, isDense: true),
       items: items
           .map((i) => DropdownMenuItem(value: i, child: Text(i)))

@@ -7,11 +7,11 @@ class PatientAvatar extends StatelessWidget {
   final Color bgColor;
 
   const PatientAvatar({
-    Key? key,
+    super.key,
     required this.initials,
     this.size = 40,
     this.bgColor = AppColors.primary,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {

@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../mock/mock_data.dart';
@@ -14,11 +15,11 @@ class SeedService {
   /// así que podemos usar el auth principal directamente sin interferir.
   Future<void> seedTodo() async {
     try {
-      print('🔵 [Seed] Iniciando...');
+      debugPrint('🔵 [Seed] Iniciando...');
 
       // 1. Crear admin en auth principal o recuperar UID existente
       final adminUid = await _crearOLoginAdmin();
-      print('✅ [Seed] Admin autenticado — UID: $adminUid');
+      debugPrint('✅ [Seed] Admin autenticado — UID: $adminUid');
 
       // 2. Verificar si el seed ya corrió (documento del admin en Firestore)
       final adminDoc = await _db
@@ -28,7 +29,7 @@ class SeedService {
           .timeout(const Duration(seconds: 10));
 
       if (adminDoc.exists) {
-        print('✅ [Seed] Admin ya existe — verificando catálogos...');
+        debugPrint('✅ [Seed] Admin ya existe — verificando catálogos...');
         // Siempre asegurar que existan servicios y clínicas
         await _ensureServiciosExisten();
         await _ensureClinicasExisten();
@@ -39,7 +40,7 @@ class SeedService {
       }
 
       // 3. Firestore vacío → escribir datos iniciales
-      print('🔵 [Seed] Escribiendo datos iniciales...');
+      debugPrint('🔵 [Seed] Escribiendo datos iniciales...');
       await _escribirDocAdmin(adminUid);
       await _seedUsuarios();
       await _seedServicios();
@@ -53,10 +54,10 @@ class SeedService {
       await _seedBoutique();
 
       await _firebaseAuth.signOut();
-      print('✅ [Seed] Completado exitosamente');
+      debugPrint('✅ [Seed] Completado exitosamente');
 
     } catch (e) {
-      print('❌ [Seed] Error: $e');
+      debugPrint('❌ [Seed] Error: $e');
       await _firebaseAuth.signOut();
     }
   }
@@ -82,7 +83,7 @@ class SeedService {
           email: email,
           password: password,
         );
-        print('  ✓ Admin creado en Firebase Auth');
+        debugPrint('  ✓ Admin creado en Firebase Auth');
         return cred.user!.uid;
       }
       rethrow;
@@ -92,7 +93,7 @@ class SeedService {
 
   /// Escribe el documento del admin en Firestore.
   Future<void> _escribirDocAdmin(String uid) async {
-    print('  🔵 Escribiendo documento admin (uid: $uid)...');
+    debugPrint('  🔵 Escribiendo documento admin (uid: $uid)...');
     final usuario = Usuario(
       id: uid,
       nombre: 'Dra. Vania López',
@@ -103,11 +104,11 @@ class SeedService {
       avatarIniciales: 'VL',
     );
     await _db.collection('usuarios').doc(uid).set(usuario.toMap());
-    print('  ✅ Documento admin creado — rol: administradora');
+    debugPrint('  ✅ Documento admin creado — rol: administradora');
   }
 
   Future<void> _seedUsuarios() async {
-    print('Sembrando usuarios...');
+    debugPrint('Sembrando usuarios...');
     final authService = AuthService();
     final usuarios = [
       ('Enf. Carmen Soto', 'carmen@renova.gt', 'renova2024', RolUsuario.enfermera),
@@ -129,16 +130,16 @@ class SeedService {
           rol: rol,
         );
         if (usuario != null) {
-          print('  ✓ Usuario creado: $email');
+          debugPrint('  ✓ Usuario creado: $email');
         }
       } catch (e) {
-        print('  ⚠ Error creando usuario $email: $e');
+        debugPrint('  ⚠ Error creando usuario $email: $e');
       }
     }
   }
 
   Future<void> _seedServicios() async {
-    print('Sembrando servicios...');
+    debugPrint('Sembrando servicios...');
     final servicios = [
       ('Clínica General', 'Consultas médicas generales'),
       ('Pediatría', 'Atención especializada para niños'),
@@ -155,12 +156,12 @@ class SeedService {
         'descripcion': descripcion,
         'activo': true,
       });
-      print('  ✓ Servicio creado: $nombre');
+      debugPrint('  ✓ Servicio creado: $nombre');
     }
   }
 
   Future<void> _seedClinicas() async {
-    print('Sembrando clínicas...');
+    debugPrint('Sembrando clínicas...');
     final clinicas = [
       ('Clínica Renova Central', 'Av. Principal 123, Zona 1'),
       ('Clínica Renova Norte', 'Blvd. del Norte 456, Zona 17'),
@@ -173,12 +174,12 @@ class SeedService {
         'direccion': direccion,
         'activo': true,
       });
-      print('  ✓ Clínica creada: $nombre');
+      debugPrint('  ✓ Clínica creada: $nombre');
     }
   }
 
   Future<void> _seedSalas() async {
-    print('Sembrando salas...');
+    debugPrint('Sembrando salas...');
     final salas = [
       ('Sala de Masajes 1', TipoSala.sala_masajes),
       ('Sala de Masajes 2', TipoSala.sala_masajes),
@@ -196,12 +197,12 @@ class SeedService {
         disponible: true,
       );
       await _db.collection('salas').add(sala.toMap());
-      print('  ✓ Sala creada: $nombre');
+      debugPrint('  ✓ Sala creada: $nombre');
     }
   }
 
   Future<void> _seedTerapeutas() async {
-    print('Sembrando terapeutas...');
+    debugPrint('Sembrando terapeutas...');
     final terapeutas = [
       ('Terapeuta Luis Choc', EspecialidadTerapeuta.masajista, 'luis@renova.gt'),
       ('Terapeuta Ana Pac', EspecialidadTerapeuta.sueroterapista, 'ana@renova.gt'),
@@ -216,12 +217,12 @@ class SeedService {
         usuarioId: usuarioId,
       );
       await _db.collection('terapeutas').add(terapeuta.toMap());
-      print('  ✓ Terapeuta creado: $nombre');
+      debugPrint('  ✓ Terapeuta creado: $nombre');
     }
   }
 
   Future<void> _seedPacientes() async {
-    print('Sembrando pacientes...');
+    debugPrint('Sembrando pacientes...');
     final pacientes = [
       Patient(
         id: '',
@@ -311,12 +312,12 @@ class SeedService {
 
     for (final paciente in pacientes) {
       await _db.collection('pacientes').add(paciente.toMap());
-      print('  ✓ Paciente creado: ${paciente.nombre}');
+      debugPrint('  ✓ Paciente creado: ${paciente.nombre}');
     }
   }
 
   Future<void> _seedCitas() async {
-    print('Sembrando citas...');
+    debugPrint('Sembrando citas...');
     final hoy = DateTime.now();
     
     final citas = [
@@ -387,12 +388,12 @@ class SeedService {
 
     for (final cita in citas) {
       await _db.collection('citas').add(cita.toMap());
-      print('  ✓ Cita creada: ${cita.hora}');
+      debugPrint('  ✓ Cita creada: ${cita.hora}');
     }
   }
 
   Future<void> _seedPlanes() async {
-    print('Sembrando planes de tratamiento...');
+    debugPrint('Sembrando planes de tratamiento...');
     final planes = [
       PlanTratamiento(
         id: '',
@@ -428,7 +429,7 @@ class SeedService {
 
     for (final plan in planes) {
       await _db.collection('planes').add(plan.toMap());
-      print('  ✓ Plan creado: ${plan.diagnostico}');
+      debugPrint('  ✓ Plan creado: ${plan.diagnostico}');
     }
   }
 
@@ -436,10 +437,10 @@ class SeedService {
   Future<void> _ensureServiciosExisten() async {
     final snap = await _db.collection('servicios').limit(1).get();
     if (snap.docs.isEmpty) {
-      print('🌱 [Seed] Creando servicios faltantes...');
+      debugPrint('🌱 [Seed] Creando servicios faltantes...');
       await _seedServicios();
     } else {
-      print('✅ [Seed] Servicios ya existen');
+      debugPrint('✅ [Seed] Servicios ya existen');
     }
   }
 
@@ -447,10 +448,10 @@ class SeedService {
   Future<void> _ensureClinicasExisten() async {
     final snap = await _db.collection('clinicas').limit(1).get();
     if (snap.docs.isEmpty) {
-      print('🌱 [Seed] Creando clínicas faltantes...');
+      debugPrint('🌱 [Seed] Creando clínicas faltantes...');
       await _seedClinicas();
     } else {
-      print('✅ [Seed] Clínicas ya existen');
+      debugPrint('✅ [Seed] Clínicas ya existen');
     }
   }
 
@@ -458,10 +459,10 @@ class SeedService {
   Future<void> _ensureMedicamentosExisten() async {
     final snap = await _db.collection('medicamentos').limit(1).get();
     if (snap.docs.isEmpty) {
-      print('🌱 [Seed] Creando medicamentos faltantes...');
+      debugPrint('🌱 [Seed] Creando medicamentos faltantes...');
       await _seedMedicamentos();
     } else {
-      print('✅ [Seed] Medicamentos ya existen');
+      debugPrint('✅ [Seed] Medicamentos ya existen');
     }
   }
 
@@ -471,7 +472,7 @@ class SeedService {
         await _db.collection('medicamentos').limit(1).get();
     if (existentes.docs.isNotEmpty) return;
 
-    print('Sembrando medicamentos...');
+    debugPrint('Sembrando medicamentos...');
     final medicamentos = [
       {
         'nombre': 'Paracetamol 500mg',
@@ -543,7 +544,7 @@ class SeedService {
         'ultimaActualizacion': FieldValue.serverTimestamp(),
         'actualizadoPor': 'seed',
       });
-      print('  ✓ Medicamento creado: ${med['nombre']}');
+      debugPrint('  ✓ Medicamento creado: ${med['nombre']}');
     }
   }
 
@@ -551,10 +552,10 @@ class SeedService {
   Future<void> _ensureBoutiqueExisten() async {
     final snap = await _db.collection('boutique').limit(1).get();
     if (snap.docs.isEmpty) {
-      print('🌱 [Seed] Creando productos de boutique faltantes...');
+      debugPrint('🌱 [Seed] Creando productos de boutique faltantes...');
       await _seedBoutique();
     } else {
-      print('✅ [Seed] Boutique ya tiene productos');
+      debugPrint('✅ [Seed] Boutique ya tiene productos');
     }
   }
 
@@ -563,7 +564,7 @@ class SeedService {
     final existentes = await _db.collection('boutique').limit(1).get();
     if (existentes.docs.isNotEmpty) return;
 
-    print('Sembrando productos de boutique...');
+    debugPrint('Sembrando productos de boutique...');
     final productos = [
       {
         'nombre': 'Uniforme Scrubs Dama Talla M',
@@ -630,7 +631,7 @@ class SeedService {
         'ultimaActualizacion': FieldValue.serverTimestamp(),
         'actualizadoPor': 'seed',
       });
-      print('  ✓ Producto boutique creado: ${p['nombre']}');
+      debugPrint('  ✓ Producto boutique creado: ${p['nombre']}');
     }
   }
 }
